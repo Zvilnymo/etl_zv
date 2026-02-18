@@ -173,7 +173,6 @@ def transform_deal(raw: dict) -> dict:
         'official_income':          raw.get('UF_CRM_62F6731E61388') or None,
         'is_closed':                _parse_bool(raw.get('UF_CRM_664F21936AC5A')),
         'callback_at':              _parse_dt(raw.get('UF_CRM_63038E43A9AB8')),
-        'creditors_secured':        _parse_bool(raw.get('UF_CRM_62F258B50C5BD')),
         'enforcement_proceeding':   _parse_bool(raw.get('UF_CRM_62F258B4EC1EC')),
         'deal_comment':             raw.get('UF_CRM_1751895751') or None,
     }

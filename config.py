@@ -82,7 +82,6 @@ DEAL_SELECT_FIELDS = [
     'UF_CRM_62F6731E61388',             # official_income
     'UF_CRM_664F21936AC5A',             # is_closed
     'UF_CRM_63038E43A9AB8',             # callback_at
-    'UF_CRM_62F258B50C5BD',             # creditors_secured (Кредит заставний?)
     'UF_CRM_62F258B4EC1EC',             # enforcement_proceeding (Виконавче провадження?)
     'UF_CRM_1751895751',                # deal_comment
 ]

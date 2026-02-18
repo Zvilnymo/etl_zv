@@ -17,7 +17,7 @@ _UPSERT_SQL = """
         qualification_level, lead_substatus, call_status, rejection_reason,
         total_debt, creditors_count, banks_count, official_income,
         is_closed, callback_at,
-        creditors_secured, enforcement_proceeding, deal_comment,
+        enforcement_proceeding, deal_comment,
         etl_loaded_at
     ) VALUES (
         %(id)s, %(stage_id)s, %(date_create)s, %(date_modify)s, %(close_date)s,
@@ -26,7 +26,7 @@ _UPSERT_SQL = """
         %(qualification_level)s, %(lead_substatus)s, %(call_status)s, %(rejection_reason)s,
         %(total_debt)s, %(creditors_count)s, %(banks_count)s, %(official_income)s,
         %(is_closed)s, %(callback_at)s,
-        %(creditors_secured)s, %(enforcement_proceeding)s, %(deal_comment)s,
+        %(enforcement_proceeding)s, %(deal_comment)s,
         NOW()
     )
     ON CONFLICT (id) DO UPDATE SET
@@ -52,7 +52,6 @@ _UPSERT_SQL = """
         official_income         = EXCLUDED.official_income,
         is_closed               = EXCLUDED.is_closed,
         callback_at             = EXCLUDED.callback_at,
-        creditors_secured       = EXCLUDED.creditors_secured,
         enforcement_proceeding  = EXCLUDED.enforcement_proceeding,
         deal_comment            = EXCLUDED.deal_comment,
         etl_loaded_at           = NOW();
