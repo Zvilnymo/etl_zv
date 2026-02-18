@@ -150,6 +150,7 @@ def transform_deal(raw: dict) -> dict:
 
     return {
         'id':                       int(raw['ID']),
+        'lead_id':                  _parse_int(raw.get('LEAD_ID')),
         'stage_id':                 raw.get('STAGE_ID'),
         'date_create':              _parse_dt(raw.get('DATE_CREATE')),
         'date_modify':              _parse_dt(raw.get('DATE_MODIFY')),

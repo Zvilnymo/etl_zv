@@ -65,6 +65,7 @@ LEAD_SELECT_FIELDS = [
 DEAL_SELECT_FIELDS = [
     'ID', 'STAGE_ID', 'DATE_CREATE', 'DATE_MODIFY', 'CLOSEDATE',
     'ASSIGNED_BY_ID', 'OPPORTUNITY',
+    'LEAD_ID',                              # ид ліда з якого створена угода
     'SOURCE_ID',
     'TRACKING_SOURCE_ID',               # tracking_source
     'UF_CRM_1660164651',                # contract_sum
