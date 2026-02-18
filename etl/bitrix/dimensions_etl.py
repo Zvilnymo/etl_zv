@@ -65,6 +65,7 @@ def _upsert_deal_stages(conn, statuses: list) -> int:
         ON CONFLICT (stage_id) DO UPDATE SET
             name                = EXCLUDED.name,
             sort                = EXCLUDED.sort,
+            category_id         = EXCLUDED.category_id,
             stage_semantic_id   = EXCLUDED.stage_semantic_id,
             updated_at          = NOW();
     """

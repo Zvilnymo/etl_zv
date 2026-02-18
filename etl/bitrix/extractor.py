@@ -69,14 +69,15 @@ def fetch_all_statuses() -> list:
 # --- История стадий ---
 
 def fetch_lead_stage_history(date_from: date, date_to: date) -> list:
-    """История переходов лидов по стадиям (entityTypeId=1)."""
+    """История переходов лидов по стадиям (entityTypeId=1).
+    Bitrix24 для лидов возвращает STATUS_ID (не STAGE_ID)."""
     return _leads_client().get_stage_history(
         entity_type_id=1,
         b24_filter={
             '>=CREATED_TIME': f'{date_from}T00:00:00',
             '<=CREATED_TIME': f'{date_to}T23:59:59',
         },
-        select=['ID', 'OWNER_ID', 'STAGE_ID', 'CREATED_TIME'],
+        select=['ID', 'OWNER_ID', 'STATUS_ID', 'CREATED_TIME'],
     )
 
 

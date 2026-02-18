@@ -178,10 +178,12 @@ def transform_deal(raw: dict) -> dict:
 
 
 def transform_lead_stage_history(raw: dict) -> dict:
+    # Для лидов API возвращает STATUS_ID, для сделок — STAGE_ID
+    stage = raw.get('STATUS_ID') or raw.get('STAGE_ID') or None
     return {
         'id':           int(raw['ID']),
         'lead_id':      int(raw['OWNER_ID']),
-        'stage_id':     raw.get('STAGE_ID', ''),
+        'stage_id':     stage,
         'created_time': _parse_dt(raw.get('CREATED_TIME')),
     }
 
