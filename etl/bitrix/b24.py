@@ -81,12 +81,16 @@ class B24:
             page = result.get('items', [])
             items.extend(page)
 
-            nxt = result.get('next')
+            # next находится на верхнем уровне ответа, не внутри result
+            nxt = response.get('next')
             if nxt is None:
                 break
             try:
                 start = int(nxt)
             except (TypeError, ValueError):
                 break
+
+            if start % 1000 == 0:
+                time.sleep(1)
 
         return items
