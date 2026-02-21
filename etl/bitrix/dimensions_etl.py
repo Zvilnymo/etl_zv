@@ -95,6 +95,25 @@ def _upsert_deal_stages(conn, statuses: list) -> int:
     return len(rows)
 
 
+def _upsert_lead_sources(conn, statuses: list) -> int:
+    sql = """
+        INSERT INTO crm.dim_lead_sources (source_id, name, sort, updated_at)
+        VALUES (%(source_id)s, %(name)s, %(sort)s, NOW())
+        ON CONFLICT (source_id) DO UPDATE SET
+            name       = EXCLUDED.name,
+            sort       = EXCLUDED.sort,
+            updated_at = NOW();
+    """
+    rows = [
+        {'source_id': s['STATUS_ID'], 'name': s.get('NAME', ''), 'sort': s.get('SORT')}
+        for s in statuses
+        if s.get('STATUS_ID') and s.get('ENTITY_ID') == 'SOURCE'
+    ]
+    with conn.cursor() as cur:
+        psycopg2.extras.execute_batch(cur, sql, rows)
+    return len(rows)
+
+
 def run() -> dict:
     start_ts = datetime.now()
     result = {'status': 'success', 'error': None, 'counts': {}}
@@ -109,6 +128,7 @@ def run() -> dict:
             result['counts']['managers']      = _upsert_managers(conn, users)
             result['counts']['lead_statuses'] = _upsert_lead_statuses(conn, statuses)
             result['counts']['deal_stages']   = _upsert_deal_stages(conn, statuses)
+            result['counts']['lead_sources']  = _upsert_lead_sources(conn, statuses)
             conn.commit()
             logger.info(f"Dimensions refreshed: {result['counts']}")
         finally:
