@@ -29,28 +29,12 @@ LEAD_SELECT_FIELDS = [
     'ASSIGNED_BY_ID', 'SOURCE_ID', 'SOURCE_DESCRIPTION',
     'NAME',                             # lead_name
     'PHONE',
-    'TRACKING_SOURCE_ID',               # tracking_source
     'UF_CRM_1745414446',                # taken_in_work_at
-    'UF_CRM_RS_UTM_SOURCE',             # utm_source
-    'UF_CRM_RS_UTM_MEDIUM',             # utm_medium
-    'UF_CRM_RS_UTM_CAMP',               # utm_campaign
-    'UF_CRM_RS_UTM_CONT',               # utm_content
-    'UF_CRM_RS_UTM_TERM',               # utm_term
-    'UF_CRM_1661157977',                # call_status
-    'UF_CRM_1689339712',                # lead_substatus
-    'UF_CRM_1659978324',                # qualification_level
     'UF_CRM_1744121338200',             # rejection_reason
-    'UF_CRM_IS_REPEATED_APPROACH',      # is_repeated
+    'UF_CRM_1765147256',                # is_repeated (ID дубля, якщо заповнено — дубль)
     'UF_CRM_62F6731E2FFAF',             # total_debt
-    'UF_CRM_1689690360653',             # banks_count
-    'UF_CRM_1689690386213',             # banks_debt
-    'UF_CRM_1689690413176',             # mfo_count
-    'UF_CRM_1689690430445',             # mfo_debt
-    'UF_CRM_1659980104',                # creditors_count
-    'UF_CRM_1661157316',                # callback_at
-    'UF_CRM_CLOSED',                    # is_closed
     'UF_CRM_1770070088854',             # service_type (Банкрутство / Досудове)
-    # Чеклист квалификации (8 вопросов)
+    # Чеклист квалификації (8 питань)
     'UF_CRM_1696816075',                # qual_1
     'UF_CRM_1696816125',                # qual_2
     'UF_CRM_1696816147',                # qual_3
