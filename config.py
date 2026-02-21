@@ -65,24 +65,14 @@ LEAD_SELECT_FIELDS = [
 DEAL_SELECT_FIELDS = [
     'ID', 'STAGE_ID', 'DATE_CREATE', 'DATE_MODIFY', 'CLOSEDATE',
     'ASSIGNED_BY_ID', 'OPPORTUNITY',
-    'LEAD_ID',                              # ид ліда з якого створена угода
+    'LEAD_ID',                          # ід ліда з якого створена угода
     'SOURCE_ID',
-    'TRACKING_SOURCE_ID',               # tracking_source
-    'UF_CRM_1660164651',                # contract_sum
-    'UF_CRM_1660164813',                # monthly_payment
     'UF_CRM_1660164927',                # payments_count
     'UF_CRM_1673613635',                # payment_start_date (Дата платежу діє з)
     'UF_CRM_1695636781',                # type_contract (raw code)
-    'UF_CRM_62F143E63871C',             # qualification_level
-    'UF_CRM_64B15CA44028F',             # lead_substatus
-    'UF_CRM_63038E43F2E06',             # call_status
     'UF_CRM_66E27ADBA3A09',             # rejection_reason
     'UF_CRM_62F6731E2FFAF',             # total_debt
     'UF_CRM_62F1495FA8BAB',             # creditors_count
     'UF_CRM_64B6A3885A7A0',             # banks_count
-    'UF_CRM_62F6731E61388',             # official_income
-    'UF_CRM_664F21936AC5A',             # is_closed
-    'UF_CRM_63038E43A9AB8',             # callback_at
-    'UF_CRM_62F258B4EC1EC',             # enforcement_proceeding (Виконавче провадження?)
     'UF_CRM_1751895751',                # deal_comment
 ]

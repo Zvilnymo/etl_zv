@@ -142,40 +142,29 @@ def transform_lead(raw: dict) -> dict:
 
 
 def transform_deal(raw: dict) -> dict:
-    monthly_payment = _parse_float(raw.get('UF_CRM_1660164813'))
-    payments_count  = _parse_int(raw.get('UF_CRM_1660164927'))
+    payments_count = _parse_int(raw.get('UF_CRM_1660164927'))
 
     type_raw      = str(raw.get('UF_CRM_1695636781') or '').strip()
     type_contract = CONTRACT_TYPE_MAP.get(type_raw, type_raw or None)
 
     return {
-        'id':                       int(raw['ID']),
-        'lead_id':                  _parse_int(raw.get('LEAD_ID')),
-        'stage_id':                 raw.get('STAGE_ID'),
-        'date_create':              _parse_dt(raw.get('DATE_CREATE')),
-        'date_modify':              _parse_dt(raw.get('DATE_MODIFY')),
-        'close_date':               _parse_dt(raw.get('CLOSEDATE')),
-        'manager_id':               _parse_int(raw.get('ASSIGNED_BY_ID')),
-        'opportunity':              _parse_float(raw.get('OPPORTUNITY')),
-        'contract_sum':             _parse_float(raw.get('UF_CRM_1660164651')),
-        'monthly_payment':          monthly_payment,
-        'payments_count':           payments_count,
-        'payment_start_date':       _parse_dt(raw.get('UF_CRM_1673613635')),
-        'type_contract':            type_contract,
-        'source_id':                raw.get('SOURCE_ID') or None,
-        'tracking_source':          raw.get('TRACKING_SOURCE_ID') or None,
-        'qualification_level':      raw.get('UF_CRM_62F143E63871C') or None,
-        'lead_substatus':           raw.get('UF_CRM_64B15CA44028F') or None,
-        'call_status':              raw.get('UF_CRM_63038E43F2E06') or None,
-        'rejection_reason':         raw.get('UF_CRM_66E27ADBA3A09') or None,
-        'total_debt':               _parse_float(raw.get('UF_CRM_62F6731E2FFAF')),
-        'creditors_count':          _parse_int(raw.get('UF_CRM_62F1495FA8BAB')),
-        'banks_count':              _parse_int(raw.get('UF_CRM_64B6A3885A7A0')),
-        'official_income':          raw.get('UF_CRM_62F6731E61388') or None,
-        'is_closed':                _parse_bool(raw.get('UF_CRM_664F21936AC5A')),
-        'callback_at':              _parse_dt(raw.get('UF_CRM_63038E43A9AB8')),
-        'enforcement_proceeding':   _parse_bool(raw.get('UF_CRM_62F258B4EC1EC')),
-        'deal_comment':             raw.get('UF_CRM_1751895751') or None,
+        'id':                int(raw['ID']),
+        'lead_id':           _parse_int(raw.get('LEAD_ID')),
+        'stage_id':          raw.get('STAGE_ID'),
+        'date_create':       _parse_dt(raw.get('DATE_CREATE')),
+        'date_modify':       _parse_dt(raw.get('DATE_MODIFY')),
+        'close_date':        _parse_dt(raw.get('CLOSEDATE')),
+        'manager_id':        _parse_int(raw.get('ASSIGNED_BY_ID')),
+        'opportunity':       _parse_float(raw.get('OPPORTUNITY')),
+        'payments_count':    payments_count,
+        'payment_start_date': _parse_dt(raw.get('UF_CRM_1673613635')),
+        'type_contract':     type_contract,
+        'source_id':         raw.get('SOURCE_ID') or None,
+        'rejection_reason':  raw.get('UF_CRM_66E27ADBA3A09') or None,
+        'total_debt':        _parse_float(raw.get('UF_CRM_62F6731E2FFAF')),
+        'creditors_count':   _parse_int(raw.get('UF_CRM_62F1495FA8BAB')),
+        'banks_count':       _parse_int(raw.get('UF_CRM_64B6A3885A7A0')),
+        'deal_comment':      raw.get('UF_CRM_1751895751') or None,
     }
 
 

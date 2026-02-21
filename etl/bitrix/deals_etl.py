@@ -12,50 +12,34 @@ logger = get_logger(__name__)
 _UPSERT_SQL = """
     INSERT INTO crm.fact_deals (
         id, lead_id, stage_id, date_create, date_modify, close_date,
-        manager_id, opportunity, contract_sum, monthly_payment, payments_count,
-        payment_start_date, type_contract, source_id, tracking_source,
-        qualification_level, lead_substatus, call_status, rejection_reason,
-        total_debt, creditors_count, banks_count, official_income,
-        is_closed, callback_at,
-        enforcement_proceeding, deal_comment,
-        etl_loaded_at
+        manager_id, opportunity, payments_count,
+        payment_start_date, type_contract, source_id,
+        rejection_reason, total_debt, creditors_count, banks_count,
+        deal_comment, etl_loaded_at
     ) VALUES (
         %(id)s, %(lead_id)s, %(stage_id)s, %(date_create)s, %(date_modify)s, %(close_date)s,
-        %(manager_id)s, %(opportunity)s, %(contract_sum)s, %(monthly_payment)s, %(payments_count)s,
-        %(payment_start_date)s, %(type_contract)s, %(source_id)s, %(tracking_source)s,
-        %(qualification_level)s, %(lead_substatus)s, %(call_status)s, %(rejection_reason)s,
-        %(total_debt)s, %(creditors_count)s, %(banks_count)s, %(official_income)s,
-        %(is_closed)s, %(callback_at)s,
-        %(enforcement_proceeding)s, %(deal_comment)s,
-        NOW()
+        %(manager_id)s, %(opportunity)s, %(payments_count)s,
+        %(payment_start_date)s, %(type_contract)s, %(source_id)s,
+        %(rejection_reason)s, %(total_debt)s, %(creditors_count)s, %(banks_count)s,
+        %(deal_comment)s, NOW()
     )
     ON CONFLICT (id) DO UPDATE SET
-        lead_id                 = EXCLUDED.lead_id,
-        stage_id                = EXCLUDED.stage_id,
-        date_modify             = EXCLUDED.date_modify,
-        close_date              = EXCLUDED.close_date,
-        manager_id              = EXCLUDED.manager_id,
-        opportunity             = EXCLUDED.opportunity,
-        contract_sum            = EXCLUDED.contract_sum,
-        monthly_payment         = EXCLUDED.monthly_payment,
-        payments_count          = EXCLUDED.payments_count,
-        payment_start_date      = EXCLUDED.payment_start_date,
-        type_contract           = EXCLUDED.type_contract,
-        source_id               = EXCLUDED.source_id,
-        tracking_source         = EXCLUDED.tracking_source,
-        qualification_level     = EXCLUDED.qualification_level,
-        lead_substatus          = EXCLUDED.lead_substatus,
-        call_status             = EXCLUDED.call_status,
-        rejection_reason        = EXCLUDED.rejection_reason,
-        total_debt              = EXCLUDED.total_debt,
-        creditors_count         = EXCLUDED.creditors_count,
-        banks_count             = EXCLUDED.banks_count,
-        official_income         = EXCLUDED.official_income,
-        is_closed               = EXCLUDED.is_closed,
-        callback_at             = EXCLUDED.callback_at,
-        enforcement_proceeding  = EXCLUDED.enforcement_proceeding,
-        deal_comment            = EXCLUDED.deal_comment,
-        etl_loaded_at           = NOW();
+        lead_id            = EXCLUDED.lead_id,
+        stage_id           = EXCLUDED.stage_id,
+        date_modify        = EXCLUDED.date_modify,
+        close_date         = EXCLUDED.close_date,
+        manager_id         = EXCLUDED.manager_id,
+        opportunity        = EXCLUDED.opportunity,
+        payments_count     = EXCLUDED.payments_count,
+        payment_start_date = EXCLUDED.payment_start_date,
+        type_contract      = EXCLUDED.type_contract,
+        source_id          = EXCLUDED.source_id,
+        rejection_reason   = EXCLUDED.rejection_reason,
+        total_debt         = EXCLUDED.total_debt,
+        creditors_count    = EXCLUDED.creditors_count,
+        banks_count        = EXCLUDED.banks_count,
+        deal_comment       = EXCLUDED.deal_comment,
+        etl_loaded_at      = NOW();
 """
 
 
