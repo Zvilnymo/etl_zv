@@ -51,6 +51,15 @@ class B24:
 
         return entities
 
+    def call(self, method: str, params: dict = None) -> dict:
+        """Одиночный вызов без пагинации (для методов типа crm.lead.fields)."""
+        response = self._post(method, params or {})
+        if 'error' in response:
+            raise RuntimeError(
+                f"B24 [{method}]: {response.get('error_description', response['error'])}"
+            )
+        return response.get('result', {})
+
     def get_stage_history(self, entity_type_id: int,
                           b24_filter: dict = None, select: list = None) -> list:
         """Пагинатор для crm.stagehistory.list (result -> {items: [], next: ...}).

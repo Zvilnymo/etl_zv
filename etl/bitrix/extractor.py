@@ -51,6 +51,13 @@ def fetch_deals(date_from: date, date_to: date) -> list:
 
 # --- Справочники ---
 
+def fetch_rejection_reason_items() -> list:
+    """Элементы списка поля UF_CRM_1744121338200 (Причина відмови) из crm.lead.fields."""
+    fields = _leads_client().call('crm.lead.fields')
+    field  = fields.get('UF_CRM_1744121338200', {})
+    return field.get('items', [])
+
+
 def fetch_users() -> list:
     return _users_client().get_list(
         'user.get',

@@ -4,7 +4,7 @@ import psycopg2.extras
 
 from db.connection import get_conn, release_conn
 from utils.logger import get_logger
-from .extractor import fetch_users, fetch_all_statuses
+from .extractor import fetch_users, fetch_all_statuses, fetch_rejection_reason_items
 
 logger = get_logger(__name__)
 
@@ -111,21 +111,41 @@ def _upsert_lead_sources(conn, statuses: list) -> int:
     return len(rows)
 
 
+def _upsert_rejection_reasons(conn, items: list) -> int:
+    sql = """
+        INSERT INTO crm.dim_rejection_reasons (id, name, updated_at)
+        VALUES (%(id)s, %(name)s, NOW())
+        ON CONFLICT (id) DO UPDATE SET
+            name       = EXCLUDED.name,
+            updated_at = NOW();
+    """
+    rows = [
+        {'id': str(item['ID']), 'name': item.get('VALUE', '')}
+        for item in items
+        if item.get('ID')
+    ]
+    with conn.cursor() as cur:
+        psycopg2.extras.execute_batch(cur, sql, rows)
+    return len(rows)
+
+
 def run() -> dict:
     start_ts = datetime.now()
     result = {'status': 'success', 'error': None, 'counts': {}}
 
     try:
         logger.info('Refreshing dimensions...')
-        users    = fetch_users()
-        statuses = fetch_all_statuses()
+        users              = fetch_users()
+        statuses           = fetch_all_statuses()
+        rejection_items    = fetch_rejection_reason_items()
 
         conn = get_conn()
         try:
-            result['counts']['managers']      = _upsert_managers(conn, users)
-            result['counts']['lead_statuses'] = _upsert_lead_statuses(conn, statuses)
-            result['counts']['deal_stages']   = _upsert_deal_stages(conn, statuses)
-            result['counts']['lead_sources']  = _upsert_lead_sources(conn, statuses)
+            result['counts']['managers']          = _upsert_managers(conn, users)
+            result['counts']['lead_statuses']     = _upsert_lead_statuses(conn, statuses)
+            result['counts']['deal_stages']       = _upsert_deal_stages(conn, statuses)
+            result['counts']['lead_sources']      = _upsert_lead_sources(conn, statuses)
+            result['counts']['rejection_reasons'] = _upsert_rejection_reasons(conn, rejection_items)
             conn.commit()
             logger.info(f"Dimensions refreshed: {result['counts']}")
         finally:
