@@ -51,11 +51,20 @@ def fetch_deals(date_from: date, date_to: date) -> list:
 
 # --- Справочники ---
 
-def fetch_rejection_reason_items() -> list:
-    """Элементы списка поля UF_CRM_1744121338200 (Причина відмови) из crm.lead.fields."""
+def _fetch_lead_field_items(field_name: str) -> list:
+    """Элементы enum-поля лида из crm.lead.fields."""
     fields = _leads_client().call('crm.lead.fields')
-    field  = fields.get('UF_CRM_1744121338200', {})
-    return field.get('items', [])
+    return fields.get(field_name, {}).get('items', [])
+
+
+def fetch_rejection_reason_items() -> list:
+    """Элементы списка UF_CRM_1744121338200 (Причина відмови)."""
+    return _fetch_lead_field_items('UF_CRM_1744121338200')
+
+
+def fetch_service_type_items() -> list:
+    """Элементы списка UF_CRM_1770070088854 (Тип послуги)."""
+    return _fetch_lead_field_items('UF_CRM_1770070088854')
 
 
 def fetch_users() -> list:
