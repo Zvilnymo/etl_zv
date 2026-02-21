@@ -25,13 +25,14 @@ def _upsert_managers(conn, users: list) -> int:
     for u in users:
         parts = [u.get('LAST_NAME') or '', u.get('NAME') or '', u.get('SECOND_NAME') or '']
         full_name = ' '.join(p.strip() for p in parts if p.strip())
+        active_val = u.get('ACTIVE', 'Y')
         rows.append({
             'id':           int(u['ID']),
             'full_name':    full_name,
             'name':         u.get('NAME'),
             'last_name':    u.get('LAST_NAME'),
             'second_name':  u.get('SECOND_NAME'),
-            'is_active':    str(u.get('ACTIVE', 'Y')).upper() == 'Y',
+            'is_active':    str(active_val).upper() in ('Y', 'TRUE', '1'),
         })
     with conn.cursor() as cur:
         psycopg2.extras.execute_batch(cur, sql, rows)
@@ -60,35 +61,31 @@ def _upsert_lead_statuses(conn, statuses: list) -> int:
 
 def _upsert_deal_stages(conn, statuses: list) -> int:
     sql = """
-        INSERT INTO crm.dim_deal_stages (stage_id, name, sort, category_id, stage_semantic_id, updated_at)
-        VALUES (%(stage_id)s, %(name)s, %(sort)s, %(category_id)s, %(stage_semantic_id)s, NOW())
+        INSERT INTO crm.dim_deal_stages (stage_id, name, sort, funnel_id, updated_at)
+        VALUES (%(stage_id)s, %(name)s, %(sort)s, %(funnel_id)s, NOW())
         ON CONFLICT (stage_id) DO UPDATE SET
-            name                = EXCLUDED.name,
-            sort                = EXCLUDED.sort,
-            category_id         = EXCLUDED.category_id,
-            stage_semantic_id   = EXCLUDED.stage_semantic_id,
-            updated_at          = NOW();
+            name       = EXCLUDED.name,
+            sort       = EXCLUDED.sort,
+            funnel_id  = EXCLUDED.funnel_id,
+            updated_at = NOW();
     """
     rows = []
     for s in statuses:
         entity_id = str(s.get('ENTITY_ID', ''))
-        # DEAL_STAGE — category 0; C{N}:DEAL_STAGE — category N
         if 'DEAL_STAGE' not in entity_id:
             continue
-        # определяем category_id из ENTITY_ID
-        if entity_id == 'DEAL_STAGE':
-            cat = 0
+        stage_id = s['STATUS_ID']
+        # funnel_id из stage_id: WON/LOSE → 0, C1:WON → 1, C10:LOSE → 10
+        if ':' in stage_id:
+            prefix = stage_id.split(':')[0]
+            funnel_id = int(prefix[1:]) if prefix.startswith('C') and prefix[1:].isdigit() else None
         else:
-            try:
-                cat = int(entity_id.split(':')[0][1:])
-            except Exception:
-                cat = None
+            funnel_id = 0
         rows.append({
-            'stage_id':         s['STATUS_ID'],
-            'name':             s.get('NAME', ''),
-            'sort':             s.get('SORT'),
-            'category_id':      cat,
-            'stage_semantic_id': s.get('SEMANTICS'),
+            'stage_id':  stage_id,
+            'name':      s.get('NAME', ''),
+            'sort':      s.get('SORT'),
+            'funnel_id': funnel_id,
         })
     with conn.cursor() as cur:
         psycopg2.extras.execute_batch(cur, sql, rows)
