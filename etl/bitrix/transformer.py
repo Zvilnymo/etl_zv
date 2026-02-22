@@ -29,6 +29,14 @@ def _parse_float(value) -> Optional[float]:
         return None
 
 
+def _parse_amount(value) -> Optional[float]:
+    """Float для финансовых полей (NUMERIC 15,2): обнуляет значения >= 10^13."""
+    v = _parse_float(value)
+    if v is not None and abs(v) >= 1e13:
+        return None
+    return v
+
+
 def _parse_int(value) -> Optional[int]:
     if value in (None, '', 'None', 'null', '0'):
         return None
@@ -112,7 +120,7 @@ def transform_lead(raw: dict) -> dict:
         'rejection_reason':       raw.get('UF_CRM_1744121338200') or None,
         # is_repeated: True если поле UF_CRM_1765147256 заполнено (содержит ID дубля)
         'is_repeated':            dup_val is not None and str(dup_val).strip() not in ('', 'None', 'null'),
-        'total_debt':             _parse_float(raw.get('UF_CRM_62F6731E2FFAF')),
+        'total_debt':             _parse_amount(raw.get('UF_CRM_62F6731E2FFAF')),
         'phone':                  _parse_phone(raw.get('PHONE')),
         'service_type':           raw.get('UF_CRM_1770070088854') or None,
         # Чеклист квалификации (8 вопросов)
@@ -141,13 +149,13 @@ def transform_deal(raw: dict) -> dict:
         'date_modify':       _parse_dt(raw.get('DATE_MODIFY')),
         'close_date':        _parse_dt(raw.get('CLOSEDATE')),
         'manager_id':        _parse_int(raw.get('ASSIGNED_BY_ID')),
-        'opportunity':       _parse_float(raw.get('OPPORTUNITY')),
+        'opportunity':       _parse_amount(raw.get('OPPORTUNITY')),
         'payments_count':    payments_count,
         'payment_start_date': _parse_dt(raw.get('UF_CRM_1673613635')),
         'type_contract':     type_contract,
         'source_id':         raw.get('SOURCE_ID') or None,
         'rejection_reason':  raw.get('UF_CRM_66E27ADBA3A09') or None,
-        'total_debt':        _parse_float(raw.get('UF_CRM_62F6731E2FFAF')),
+        'total_debt':        _parse_amount(raw.get('UF_CRM_62F6731E2FFAF')),
         'creditors_count':   _parse_int(raw.get('UF_CRM_62F1495FA8BAB')),
         'banks_count':       _parse_int(raw.get('UF_CRM_64B6A3885A7A0')),
         'deal_comment':      raw.get('UF_CRM_1751895751') or None,
