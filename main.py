@@ -3,8 +3,9 @@
 Оркестратор ETL: Bitrix24 → PostgreSQL
 
 Режимы запуска:
-  python main.py --mode initial       # первичная загрузка с 2024-01-01 по сегодня
-  python main.py --mode incremental   # ежедневный инкремент (по умолчанию)
+  python main.py --mode initial                              # полная загрузка с 2024-01-01 по сегодня
+  python main.py --mode incremental                         # ежедневный инкремент (по умолчанию)
+  python main.py --mode backfill --date-from 2025-12-01 --date-to 2025-12-31  # дозагрузка за период
 """
 import argparse
 from datetime import date, timedelta
@@ -83,18 +84,38 @@ def run_initial():
     logger.info('=== INITIAL LOAD DONE ===')
 
 
+def run_backfill(date_from: date, date_to: date):
+    """Дозагрузка за произвольный диапазон дат (по DATE_MODIFY), помесячно."""
+    logger.info(f'=== BACKFILL: {date_from} → {date_to} ===')
+
+    current = date_from
+    while current <= date_to:
+        batch_end = min(current + relativedelta(months=1) - timedelta(days=1), date_to)
+        logger.info(f'Batch: {current} → {batch_end}')
+        _run_batch(current, batch_end, 'backfill')
+        current = current + relativedelta(months=1)
+
+    logger.info('=== BACKFILL DONE ===')
+
+
 def main():
     parser = argparse.ArgumentParser(description='Bitrix24 → PostgreSQL ETL')
     parser.add_argument(
         '--mode',
-        choices=['initial', 'incremental'],
+        choices=['initial', 'incremental', 'backfill'],
         default='incremental',
-        help='initial = полная загрузка с 2024-01-01; incremental = вчерашний день',
+        help='initial = полная загрузка с 2024-01-01; incremental = вчерашний день; backfill = дозагрузка за период',
     )
+    parser.add_argument('--date-from', type=date.fromisoformat, help='Начало периода для backfill (YYYY-MM-DD)')
+    parser.add_argument('--date-to',   type=date.fromisoformat, help='Конец периода для backfill (YYYY-MM-DD)')
     args = parser.parse_args()
 
     if args.mode == 'initial':
         run_initial()
+    elif args.mode == 'backfill':
+        if not args.date_from or not args.date_to:
+            parser.error('--date-from and --date-to are required for backfill mode')
+        run_backfill(args.date_from, args.date_to)
     else:
         run_incremental()
 
