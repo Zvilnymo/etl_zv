@@ -61,11 +61,23 @@ def run(date_from: date, date_to: date) -> dict:
 
         conn = get_conn()
         try:
+            skipped = []
             with conn.cursor() as cur:
-                psycopg2.extras.execute_batch(cur, _UPSERT_SQL, rows, page_size=500)
+                for row in rows:
+                    try:
+                        cur.execute('SAVEPOINT sp')
+                        cur.execute(_UPSERT_SQL, row)
+                        cur.execute('RELEASE SAVEPOINT sp')
+                    except Exception as row_err:
+                        cur.execute('ROLLBACK TO SAVEPOINT sp')
+                        skipped.append(row['id'])
+                        logger.warning(f'Deals: skipped deal id={row["id"]}: {row_err}')
             conn.commit()
-            result['records_upserted'] = len(rows)
-            logger.info(f'Deals: upserted {len(rows)}')
+            upserted = len(rows) - len(skipped)
+            result['records_upserted'] = upserted
+            logger.info(f'Deals: upserted {upserted}')
+            if skipped:
+                logger.warning(f'Deals: skipped {len(skipped)} deals with errors: {skipped}')
         finally:
             release_conn(conn)
 
