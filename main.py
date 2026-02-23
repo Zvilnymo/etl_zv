@@ -55,13 +55,14 @@ def _run_batch(date_from: date, date_to: date, mode: str):
 
 
 def run_incremental():
-    yesterday = date.today() - timedelta(days=1)
-    logger.info(f'=== INCREMENTAL: {yesterday} ===')
+    today     = date.today()
+    yesterday = today - timedelta(days=1)
+    logger.info(f'=== INCREMENTAL: {yesterday} → {today} ===')
 
     res = dimensions_etl.run()
-    _log_run('dimensions', 'incremental', yesterday, yesterday, res)
+    _log_run('dimensions', 'incremental', yesterday, today, res)
 
-    _run_batch(yesterday, yesterday, 'incremental')
+    _run_batch(yesterday, today, 'incremental')
 
     logger.info('=== INCREMENTAL DONE ===')
 
