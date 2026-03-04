@@ -6,6 +6,7 @@
   python main.py --mode initial                              # полная загрузка с 2024-01-01 по сегодня
   python main.py --mode incremental                         # ежедневный инкремент (по умолчанию)
   python main.py --mode backfill --date-from 2025-12-01 --date-to 2025-12-31  # дозагрузка за период
+  python main.py --mode backfill-history --date-from 2024-01-01 --date-to 2025-03-04  # только история стадий
 """
 import argparse
 from datetime import date, timedelta
@@ -99,13 +100,29 @@ def run_backfill(date_from: date, date_to: date):
     logger.info('=== BACKFILL DONE ===')
 
 
+def run_backfill_history(date_from: date, date_to: date):
+    """Дозагрузка только истории стадий (без лидов и сделок), помесячно.
+    Используется для наполнения fact_pre_court_stage_history и fact_court_stage_history."""
+    logger.info(f'=== BACKFILL HISTORY: {date_from} → {date_to} ===')
+
+    current = date_from
+    while current <= date_to:
+        batch_end = min(current + relativedelta(months=1) - timedelta(days=1), date_to)
+        logger.info(f'Batch: {current} → {batch_end}')
+        res = stage_history_etl.run(current, batch_end)
+        _log_run('stage_history', 'backfill-history', current, batch_end, res)
+        current = current + relativedelta(months=1)
+
+    logger.info('=== BACKFILL HISTORY DONE ===')
+
+
 def main():
     parser = argparse.ArgumentParser(description='Bitrix24 → PostgreSQL ETL')
     parser.add_argument(
         '--mode',
-        choices=['initial', 'incremental', 'backfill'],
+        choices=['initial', 'incremental', 'backfill', 'backfill-history'],
         default='incremental',
-        help='initial = полная загрузка с 2024-01-01; incremental = вчерашний день; backfill = дозагрузка за период',
+        help='initial = полная загрузка с 2024-01-01; incremental = вчерашний день; backfill = дозагрузка за период; backfill-history = только история стадий',
     )
     parser.add_argument('--date-from', type=date.fromisoformat, help='Начало периода для backfill (YYYY-MM-DD)')
     parser.add_argument('--date-to',   type=date.fromisoformat, help='Конец периода для backfill (YYYY-MM-DD)')
@@ -117,6 +134,10 @@ def main():
         if not args.date_from or not args.date_to:
             parser.error('--date-from and --date-to are required for backfill mode')
         run_backfill(args.date_from, args.date_to)
+    elif args.mode == 'backfill-history':
+        if not args.date_from or not args.date_to:
+            parser.error('--date-from and --date-to are required for backfill-history mode')
+        run_backfill_history(args.date_from, args.date_to)
     else:
         run_incremental()
 
