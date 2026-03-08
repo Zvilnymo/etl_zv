@@ -51,7 +51,7 @@ LEAD_SELECT_FIELDS = [
 PRE_COURT_DEAL_SELECT_FIELDS = [
     'ID', 'STAGE_ID', 'DATE_CREATE', 'DATE_MODIFY', 'CLOSEDATE',
     'ASSIGNED_BY_ID', 'SOURCE_ID',
-    'LEAD_ID',
+    'LEAD_ID', 'CONTACT_ID',
     'UF_CRM_1708783848',            # consultant_id (employee: продажний менеджер)
     'UF_CRM_62F6731E2FFAF',         # total_debt
     'UF_CRM_1660164651',            # contract_amount (money)
@@ -77,7 +77,7 @@ PRE_COURT_DEAL_SELECT_FIELDS = [
 COURT_DEAL_SELECT_FIELDS = [
     'ID', 'STAGE_ID', 'DATE_CREATE', 'DATE_MODIFY', 'CLOSEDATE',
     'ASSIGNED_BY_ID', 'SOURCE_ID',
-    'LEAD_ID',
+    'LEAD_ID', 'CONTACT_ID',
     'UF_CRM_1708783848',            # consultant_id (employee: менеджер продажу)
     'UF_CRM_62F6731E2FFAF',         # total_debt
     'UF_CRM_1660164651',            # contract_amount (money)
@@ -106,6 +106,7 @@ DEAL_SELECT_FIELDS = [
     'ID', 'STAGE_ID', 'DATE_CREATE', 'DATE_MODIFY', 'CLOSEDATE',
     'ASSIGNED_BY_ID', 'OPPORTUNITY',
     'LEAD_ID',                          # ід ліда з якого створена угода
+    'CONTACT_ID',                       # контакт (для зв'язку з pre_court / court)
     'SOURCE_ID',
     'UF_CRM_1660164927',                # payments_count
     'UF_CRM_1673613635',                # payment_start_date (Дата платежу діє з)

@@ -11,7 +11,7 @@ logger = get_logger(__name__)
 
 _UPSERT_SQL = """
     INSERT INTO crm.fact_court_deals (
-        id, lead_id, stage_id, date_create, date_modify, close_date,
+        id, lead_id, contact_id, stage_id, date_create, date_modify, close_date,
         manager_id, source_id, consultant_id,
         total_debt, contract_amount, monthly_payment, payments_count, payment_start_date,
         income_total, expenses_total, income_delta,
@@ -20,7 +20,7 @@ _UPSERT_SQL = """
         debt_to_write_off, delta_60months,
         etl_loaded_at
     ) VALUES (
-        %(id)s, %(lead_id)s, %(stage_id)s, %(date_create)s, %(date_modify)s, %(close_date)s,
+        %(id)s, %(lead_id)s, %(contact_id)s, %(stage_id)s, %(date_create)s, %(date_modify)s, %(close_date)s,
         %(manager_id)s, %(source_id)s, %(consultant_id)s,
         %(total_debt)s, %(contract_amount)s, %(monthly_payment)s, %(payments_count)s, %(payment_start_date)s,
         %(income_total)s, %(expenses_total)s, %(income_delta)s,
@@ -31,6 +31,7 @@ _UPSERT_SQL = """
     )
     ON CONFLICT (id) DO UPDATE SET
         lead_id            = EXCLUDED.lead_id,
+        contact_id         = EXCLUDED.contact_id,
         stage_id           = EXCLUDED.stage_id,
         date_modify        = EXCLUDED.date_modify,
         close_date         = EXCLUDED.close_date,
