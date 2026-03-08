@@ -14,7 +14,7 @@ from datetime import date, timedelta
 from dateutil.relativedelta import relativedelta
 
 from db.connection import get_conn, release_conn
-from etl.bitrix import dimensions_etl, leads_etl, deals_etl, stage_history_etl
+from etl.bitrix import dimensions_etl, leads_etl, deals_etl, stage_history_etl, pre_court_deals_etl
 from utils.logger import get_logger
 from config import INITIAL_LOAD_FROM
 
@@ -50,6 +50,9 @@ def _run_batch(date_from: date, date_to: date, mode: str):
 
     res = deals_etl.run(date_from, date_to)
     _log_run('deals', mode, date_from, date_to, res)
+
+    res = pre_court_deals_etl.run(date_from, date_to)
+    _log_run('pre_court_deals', mode, date_from, date_to, res)
 
     res = stage_history_etl.run(date_from, date_to)
     _log_run('stage_history', mode, date_from, date_to, res)

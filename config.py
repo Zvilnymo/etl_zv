@@ -12,10 +12,11 @@ B24_TOKEN_USERS = os.environ['B24_TOKEN_USERS']   # user.get
 DATABASE_URL = os.environ['DATABASE_URL']
 
 # --- ETL settings ---
-INITIAL_LOAD_FROM  = date(2024, 1, 1)
-DEALS_CATEGORY_ID  = 0           # воронка продаж (category 0)
-WORK_START_HOUR    = 9           # начало рабочего дня для расчёта времени реакции
-WORK_END_HOUR      = 21          # конец рабочего дня
+INITIAL_LOAD_FROM       = date(2024, 1, 1)
+DEALS_CATEGORY_ID       = 0     # воронка продаж (category 0)
+PRE_COURT_CATEGORY_ID   = 1     # воронка "Підготовка до суду" (category 1)
+WORK_START_HOUR         = 9     # начало рабочего дня для расчёта времени реакции
+WORK_END_HOUR           = 21    # конец рабочего дня
 
 # Маппинг типов контракта (UF_CRM_1695636781)
 CONTRACT_TYPE_MAP = {
@@ -43,6 +44,32 @@ LEAD_SELECT_FIELDS = [
     'UF_CRM_1696816289',                # qual_6: Чи не грали в азартні ігри останні 2-3 міс
     'UF_CRM_1696816306',                # qual_7: Чи мали відношення до підприємницької діяльності
     'UF_CRM_1696847216',                # qual_8: Чи є майно, придбане у шлюбі
+]
+
+# Поля для выгрузки угод воронки "Підготовка до суду" (category 1)
+PRE_COURT_DEAL_SELECT_FIELDS = [
+    'ID', 'STAGE_ID', 'DATE_CREATE', 'DATE_MODIFY', 'CLOSEDATE',
+    'ASSIGNED_BY_ID', 'SOURCE_ID',
+    'LEAD_ID',
+    'UF_CRM_1708783848',            # consultant_id (employee: продажний менеджер)
+    'UF_CRM_62F6731E2FFAF',         # total_debt
+    'UF_CRM_1660164651',            # contract_amount (money)
+    'UF_CRM_1660164813',            # monthly_payment (money)
+    'UF_CRM_1660164927',            # payments_count
+    'UF_CRM_1673613635',            # payment_start_date
+    'UF_CRM_1660396355',            # income_total (money)
+    'UF_CRM_1660396392',            # expenses_total (money)
+    'UF_CRM_1660396420',            # income_delta (money)
+    'UF_CRM_1695636781',            # type_contract (enum)
+    'UF_CRM_62F1495FA8BAB',         # creditors_count
+    'UF_CRM_64B6A3885A7A0',         # banks_count
+    'UF_CRM_64B6A38A32EB0',         # mfo_count
+    'UF_CRM_1675855655007',         # contract_number
+    'UF_CRM_1745420729',            # court_filing_date (datetime)
+    'UF_CRM_6808EA31C2E47',         # taken_in_work_at (datetime)
+    'UF_CRM_62F143E63871C',         # pass_rate (enum)
+    'UF_CRM_66E27ADBA3A09',         # rejection_reason (enum)
+    'UF_CRM_1751895751',            # deal_comment
 ]
 
 # Поля для выгрузки сделок

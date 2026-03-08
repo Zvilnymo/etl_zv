@@ -4,6 +4,7 @@ from config import (
     B24_DOMAIN, B24_USER_ID,
     B24_TOKEN_LEADS, B24_TOKEN_DEALS, B24_TOKEN_USERS,
     LEAD_SELECT_FIELDS, DEAL_SELECT_FIELDS, DEALS_CATEGORY_ID,
+    PRE_COURT_CATEGORY_ID, PRE_COURT_DEAL_SELECT_FIELDS,
 )
 from .b24 import B24
 
@@ -49,6 +50,19 @@ def fetch_deals(date_from: date, date_to: date) -> list:
     )
 
 
+def fetch_pre_court_deals(date_from: date, date_to: date) -> list:
+    """Угоди воронки "Підготовка до суду" (category 1) з DATE_MODIFY в діапазоні."""
+    return _deals_client().get_list(
+        'crm.deal.list',
+        b24_filter={
+            'CATEGORY_ID': PRE_COURT_CATEGORY_ID,
+            '>=DATE_MODIFY': f'{date_from}T00:00:00',
+            '<=DATE_MODIFY': f'{date_to}T23:59:59',
+        },
+        select=PRE_COURT_DEAL_SELECT_FIELDS,
+    )
+
+
 # --- Справочники ---
 
 def _fetch_lead_field_items(field_name: str) -> list:
@@ -58,12 +72,10 @@ def _fetch_lead_field_items(field_name: str) -> list:
 
 
 def fetch_rejection_reason_items() -> list:
-    """Элементы списка UF_CRM_1744121338200 (Причина відмови)."""
     return _fetch_lead_field_items('UF_CRM_1744121338200')
 
 
 def fetch_service_type_items() -> list:
-    """Элементы списка UF_CRM_1770070088854 (Тип послуги)."""
     return _fetch_lead_field_items('UF_CRM_1770070088854')
 
 
@@ -75,7 +87,6 @@ def fetch_users() -> list:
 
 
 def fetch_all_statuses() -> list:
-    """Все статусы CRM — фильтруем по ENTITY_ID в dimensions_etl."""
     return _leads_client().get_list(
         'crm.status.list',
         select=['STATUS_ID', 'ENTITY_ID', 'NAME', 'SORT', 'SEMANTICS'],
@@ -85,8 +96,6 @@ def fetch_all_statuses() -> list:
 # --- История стадий ---
 
 def fetch_lead_stage_history(date_from: date, date_to: date) -> list:
-    """История переходов лидов по стадиям (entityTypeId=1).
-    Bitrix24 для лидов возвращает STATUS_ID (не STAGE_ID)."""
     return _leads_client().get_stage_history(
         entity_type_id=1,
         b24_filter={
@@ -98,7 +107,6 @@ def fetch_lead_stage_history(date_from: date, date_to: date) -> list:
 
 
 def fetch_deal_stage_history(date_from: date, date_to: date) -> list:
-    """История переходов сделок по стадиям (entityTypeId=2)."""
     return _deals_client().get_stage_history(
         entity_type_id=2,
         b24_filter={
