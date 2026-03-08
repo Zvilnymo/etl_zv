@@ -205,6 +205,40 @@ def _parse_employee(value) -> 'Optional[int]':
     return _parse_int(value)
 
 
+def transform_court_deal(raw: dict) -> dict:
+    return {
+        'id':                 int(raw['ID']),
+        'lead_id':            _parse_int(raw.get('LEAD_ID')),
+        'stage_id':           raw.get('STAGE_ID'),
+        'date_create':        _parse_dt(raw.get('DATE_CREATE')),
+        'date_modify':        _parse_dt(raw.get('DATE_MODIFY')),
+        'close_date':         _parse_dt(raw.get('CLOSEDATE')),
+        'manager_id':         _parse_int(raw.get('ASSIGNED_BY_ID')),
+        'source_id':          raw.get('SOURCE_ID') or None,
+        'consultant_id':      _parse_employee(raw.get('UF_CRM_1708783848')),
+        'total_debt':         _parse_amount(raw.get('UF_CRM_62F6731E2FFAF')),
+        'contract_amount':    _parse_money(raw.get('UF_CRM_1660164651')),
+        'monthly_payment':    _parse_money(raw.get('UF_CRM_1660164813')),
+        'payments_count':     _parse_int(raw.get('UF_CRM_1660164927')),
+        'payment_start_date': _parse_dt(raw.get('UF_CRM_1673613635')),
+        'income_total':       _parse_money(raw.get('UF_CRM_1660396355')),
+        'expenses_total':     _parse_money(raw.get('UF_CRM_1660396392')),
+        'income_delta':       _parse_money(raw.get('UF_CRM_1660396420')),
+        'type_contract':      raw.get('UF_CRM_1695636781') or None,
+        'creditors_count':    _parse_int(raw.get('UF_CRM_62F1495FA8BAB')),
+        'banks_count':        _parse_int(raw.get('UF_CRM_64B6A3885A7A0')),
+        'mfo_count':          _parse_int(raw.get('UF_CRM_64B6A38A32EB0')),
+        'contract_number':    _parse_int(raw.get('UF_CRM_1675855655007')),
+        'court_filing_date':  _parse_dt(raw.get('UF_CRM_1745420729')),
+        'taken_in_work_at':   _parse_dt(raw.get('UF_CRM_6808EA31C2E47')),
+        'pass_rate':          raw.get('UF_CRM_62F143E63871C') or None,
+        'rejection_reason':   raw.get('UF_CRM_66E27ADBA3A09') or None,
+        'deal_comment':       raw.get('UF_CRM_1751895751') or None,
+        'debt_to_write_off':  _parse_amount(raw.get('UF_CRM_1733737682868')),
+        'delta_60months':     _parse_money(raw.get('UF_CRM_1660396636')),
+    }
+
+
 def transform_pre_court_deal(raw: dict) -> dict:
     return {
         'id':                int(raw['ID']),

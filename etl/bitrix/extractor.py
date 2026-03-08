@@ -5,6 +5,7 @@ from config import (
     B24_TOKEN_LEADS, B24_TOKEN_DEALS, B24_TOKEN_USERS,
     LEAD_SELECT_FIELDS, DEAL_SELECT_FIELDS, DEALS_CATEGORY_ID,
     PRE_COURT_CATEGORY_ID, PRE_COURT_DEAL_SELECT_FIELDS,
+    COURT_CATEGORY_ID, COURT_DEAL_SELECT_FIELDS,
 )
 from .b24 import B24
 
@@ -60,6 +61,19 @@ def fetch_pre_court_deals(date_from: date, date_to: date) -> list:
             '<=DATE_MODIFY': f'{date_to}T23:59:59',
         },
         select=PRE_COURT_DEAL_SELECT_FIELDS,
+    )
+
+
+def fetch_court_deals(date_from: date, date_to: date) -> list:
+    """Угоди воронки "Суд" (category 2) з DATE_MODIFY в діапазоні."""
+    return _deals_client().get_list(
+        'crm.deal.list',
+        b24_filter={
+            'CATEGORY_ID': COURT_CATEGORY_ID,
+            '>=DATE_MODIFY': f'{date_from}T00:00:00',
+            '<=DATE_MODIFY': f'{date_to}T23:59:59',
+        },
+        select=COURT_DEAL_SELECT_FIELDS,
     )
 
 
