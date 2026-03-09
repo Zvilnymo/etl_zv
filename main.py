@@ -6,6 +6,7 @@
   python main.py --mode initial                                                          # полная загрузка с 2024-01-01 по сегодня
   python main.py --mode incremental                                                      # ежедневный инкремент (по умолчанию)
   python main.py --mode backfill --date-from 2025-12-01 --date-to 2025-12-31            # все ETL за период
+  python main.py --mode backfill-deals --date-from 2024-01-01 --date-to 2026-03-08      # только fact_deals + dim_contacts
   python main.py --mode backfill-pre-court --date-from 2024-01-01 --date-to 2026-03-08  # только fact_pre_court_deals
   python main.py --mode backfill-court --date-from 2024-01-01 --date-to 2026-03-08      # только fact_court_deals
   python main.py --mode backfill-history --date-from 2024-01-01 --date-to 2025-03-04    # только история стадий
@@ -16,7 +17,7 @@ from datetime import date, timedelta
 from dateutil.relativedelta import relativedelta
 
 from db.connection import get_conn, release_conn
-from etl.bitrix import dimensions_etl, leads_etl, deals_etl, stage_history_etl, pre_court_deals_etl, court_deals_etl
+from etl.bitrix import dimensions_etl, leads_etl, deals_etl, stage_history_etl, pre_court_deals_etl, court_deals_etl, contacts_etl
 from utils.logger import get_logger
 from config import INITIAL_LOAD_FROM
 
@@ -49,6 +50,9 @@ def _run_batch(date_from: date, date_to: date, mode: str):
     """Запускает все ETL для одного временного периода."""
     res = leads_etl.run(date_from, date_to)
     _log_run('leads', mode, date_from, date_to, res)
+
+    res = contacts_etl.run(date_from, date_to)
+    _log_run('contacts', mode, date_from, date_to, res)
 
     res = deals_etl.run(date_from, date_to)
     _log_run('deals', mode, date_from, date_to, res)
@@ -108,6 +112,23 @@ def run_backfill(date_from: date, date_to: date):
     logger.info('=== BACKFILL DONE ===')
 
 
+def run_backfill_deals(date_from: date, date_to: date):
+    """Дозагрузка тільки угод воронки продажів (category 0) + контактів, помісячно."""
+    logger.info(f'=== BACKFILL DEALS: {date_from} → {date_to} ===')
+
+    current = date_from
+    while current <= date_to:
+        batch_end = min(current + relativedelta(months=1) - timedelta(days=1), date_to)
+        logger.info(f'Batch: {current} → {batch_end}')
+        res = contacts_etl.run(current, batch_end)
+        _log_run('contacts', 'backfill-deals', current, batch_end, res)
+        res = deals_etl.run(current, batch_end)
+        _log_run('deals', 'backfill-deals', current, batch_end, res)
+        current = current + relativedelta(months=1)
+
+    logger.info('=== BACKFILL DEALS DONE ===')
+
+
 def run_backfill_pre_court(date_from: date, date_to: date):
     """Дозагрузка тільки угод воронки 'Підготовка до суду' (category 1), помісячно."""
     logger.info(f'=== BACKFILL PRE-COURT: {date_from} → {date_to} ===')
@@ -158,9 +179,9 @@ def main():
     parser = argparse.ArgumentParser(description='Bitrix24 → PostgreSQL ETL')
     parser.add_argument(
         '--mode',
-        choices=['initial', 'incremental', 'backfill', 'backfill-pre-court', 'backfill-court', 'backfill-history'],
+        choices=['initial', 'incremental', 'backfill', 'backfill-deals', 'backfill-pre-court', 'backfill-court', 'backfill-history'],
         default='incremental',
-        help='initial | incremental | backfill | backfill-pre-court | backfill-court | backfill-history',
+        help='initial | incremental | backfill | backfill-deals | backfill-pre-court | backfill-court | backfill-history',
     )
     parser.add_argument('--date-from', type=date.fromisoformat, help='Начало периода для backfill (YYYY-MM-DD)')
     parser.add_argument('--date-to',   type=date.fromisoformat, help='Конец периода для backfill (YYYY-MM-DD)')
@@ -172,6 +193,10 @@ def main():
         if not args.date_from or not args.date_to:
             parser.error('--date-from and --date-to are required for backfill mode')
         run_backfill(args.date_from, args.date_to)
+    elif args.mode == 'backfill-deals':
+        if not args.date_from or not args.date_to:
+            parser.error('--date-from and --date-to are required for backfill-deals mode')
+        run_backfill_deals(args.date_from, args.date_to)
     elif args.mode == 'backfill-pre-court':
         if not args.date_from or not args.date_to:
             parser.error('--date-from and --date-to are required for backfill-pre-court mode')

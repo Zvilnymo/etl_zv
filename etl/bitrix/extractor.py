@@ -77,6 +77,20 @@ def fetch_court_deals(date_from: date, date_to: date) -> list:
     )
 
 
+# --- Контакти ---
+
+def fetch_contacts(date_from: date, date_to: date) -> list:
+    """Контакти з DATE_MODIFY в діапазоні (для dim_contacts)."""
+    return _deals_client().get_list(
+        'crm.contact.list',
+        b24_filter={
+            '>=DATE_MODIFY': f'{date_from}T00:00:00',
+            '<=DATE_MODIFY': f'{date_to}T23:59:59',
+        },
+        select=['ID', 'NAME', 'LAST_NAME', 'SECOND_NAME', 'PHONE'],
+    )
+
+
 # --- Справочники ---
 
 def _fetch_lead_field_items(field_name: str) -> list:
