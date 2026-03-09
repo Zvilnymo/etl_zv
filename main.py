@@ -81,6 +81,9 @@ def run_incremental():
 
     _run_batch(yesterday, today, 'incremental')
 
+    res = ringostat_calls_etl.run(yesterday, today)
+    _log_run('ringostat_calls', 'incremental', yesterday, today, res)
+
     logger.info('=== INCREMENTAL DONE ===')
 
 
