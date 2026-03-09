@@ -1,6 +1,20 @@
 import os
 from datetime import date
 
+# --- Ringostat ---
+RINGOSTAT_AUTH_KEY  = os.environ['RINGOSTAT_AUTH_KEY']
+RINGOSTAT_PROJECT_ID = os.environ.get('RINGOSTAT_PROJECT_ID', '221472')
+
+RINGOSTAT_FIELDS = [
+    'calldate', 'caller', 'caller_number', 'dst', 'pool_name',
+    'disposition', 'call_type', 'duration', 'waittime', 'billsec',
+    'repeated_flag', 'proper_flag',
+    'utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term',
+    'uniqueid', 'employee_number', 'employee_fio', 'department',
+    'scheme_name', 'connected_with', 'landing', 'refferrer',
+    'recording', 'has_recording',
+]
+
 # --- Bitrix24 ---
 B24_DOMAIN     = os.environ['B24_DOMAIN']
 B24_USER_ID    = int(os.environ['B24_USER_ID'])

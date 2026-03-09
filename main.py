@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
 """
-Оркестратор ETL: Bitrix24 → PostgreSQL
+Оркестратор ETL: Bitrix24 + Ringostat → PostgreSQL
 
 Режимы запуска:
-  python main.py --mode initial                                                          # полная загрузка с 2024-01-01 по сегодня
-  python main.py --mode incremental                                                      # ежедневный инкремент (по умолчанию)
-  python main.py --mode backfill --date-from 2025-12-01 --date-to 2025-12-31            # все ETL за период
-  python main.py --mode backfill-deals --date-from 2024-01-01 --date-to 2026-03-08      # только fact_deals + dim_contacts
-  python main.py --mode backfill-pre-court --date-from 2024-01-01 --date-to 2026-03-08  # только fact_pre_court_deals
-  python main.py --mode backfill-court --date-from 2024-01-01 --date-to 2026-03-08      # только fact_court_deals
-  python main.py --mode backfill-history --date-from 2024-01-01 --date-to 2025-03-04    # только история стадий
+  python main.py --mode initial                                                              # полная загрузка с 2024-01-01 по сегодня
+  python main.py --mode incremental                                                          # ежедневный инкремент (по умолчанию)
+  python main.py --mode backfill --date-from 2025-12-01 --date-to 2025-12-31               # все ETL за период
+  python main.py --mode backfill-deals --date-from 2024-01-01 --date-to 2026-03-08         # только fact_deals + dim_contacts
+  python main.py --mode backfill-pre-court --date-from 2024-01-01 --date-to 2026-03-08     # только fact_pre_court_deals
+  python main.py --mode backfill-court --date-from 2024-01-01 --date-to 2026-03-08         # только fact_court_deals
+  python main.py --mode backfill-history --date-from 2024-01-01 --date-to 2025-03-04       # только история стадий
+  python main.py --mode ringostat-initial                                                    # загрузка всех звонков с 2024-01-01
+  python main.py --mode ringostat-incremental                                                # ежедневный инкремент звонков
+  python main.py --mode ringostat-backfill --date-from 2025-01-01 --date-to 2025-12-31     # звонки за произвольный период
 """
 import argparse
 from datetime import date, timedelta
@@ -18,6 +21,7 @@ from dateutil.relativedelta import relativedelta
 
 from db.connection import get_conn, release_conn
 from etl.bitrix import dimensions_etl, leads_etl, deals_etl, stage_history_etl, pre_court_deals_etl, court_deals_etl, contacts_etl
+from etl.ringostat import calls_etl as ringostat_calls_etl
 from utils.logger import get_logger
 from config import INITIAL_LOAD_FROM
 
@@ -159,6 +163,42 @@ def run_backfill_court(date_from: date, date_to: date):
     logger.info('=== BACKFILL COURT DONE ===')
 
 
+def run_ringostat_initial():
+    """Повна загрузка дзвінків з INITIAL_LOAD_FROM по сьогодні, помісячно."""
+    logger.info(f'=== RINGOSTAT INITIAL from {INITIAL_LOAD_FROM} ===')
+    current = INITIAL_LOAD_FROM
+    today   = date.today()
+    while current < today:
+        batch_end = min(current + relativedelta(months=1) - timedelta(days=1), today)
+        logger.info(f'Ringostat batch: {current} → {batch_end}')
+        res = ringostat_calls_etl.run(current, batch_end)
+        _log_run('ringostat_calls', 'ringostat-initial', current, batch_end, res)
+        current = current + relativedelta(months=1)
+    logger.info('=== RINGOSTAT INITIAL DONE ===')
+
+
+def run_ringostat_incremental():
+    today     = date.today()
+    yesterday = today - timedelta(days=1)
+    logger.info(f'=== RINGOSTAT INCREMENTAL: {yesterday} → {today} ===')
+    res = ringostat_calls_etl.run(yesterday, today)
+    _log_run('ringostat_calls', 'ringostat-incremental', yesterday, today, res)
+    logger.info('=== RINGOSTAT INCREMENTAL DONE ===')
+
+
+def run_ringostat_backfill(date_from: date, date_to: date):
+    """Дозагрузка дзвінків за довільний діапазон, помісячно."""
+    logger.info(f'=== RINGOSTAT BACKFILL: {date_from} → {date_to} ===')
+    current = date_from
+    while current <= date_to:
+        batch_end = min(current + relativedelta(months=1) - timedelta(days=1), date_to)
+        logger.info(f'Ringostat batch: {current} → {batch_end}')
+        res = ringostat_calls_etl.run(current, batch_end)
+        _log_run('ringostat_calls', 'ringostat-backfill', current, batch_end, res)
+        current = current + relativedelta(months=1)
+    logger.info('=== RINGOSTAT BACKFILL DONE ===')
+
+
 def run_backfill_history(date_from: date, date_to: date):
     """Дозагрузка только истории стадий (без лидов и сделок), помесячно.
     Используется для наполнения fact_pre_court_stage_history и fact_court_stage_history."""
@@ -179,9 +219,13 @@ def main():
     parser = argparse.ArgumentParser(description='Bitrix24 → PostgreSQL ETL')
     parser.add_argument(
         '--mode',
-        choices=['initial', 'incremental', 'backfill', 'backfill-deals', 'backfill-pre-court', 'backfill-court', 'backfill-history'],
+        choices=[
+            'initial', 'incremental', 'backfill',
+            'backfill-deals', 'backfill-pre-court', 'backfill-court', 'backfill-history',
+            'ringostat-initial', 'ringostat-incremental', 'ringostat-backfill',
+        ],
         default='incremental',
-        help='initial | incremental | backfill | backfill-deals | backfill-pre-court | backfill-court | backfill-history',
+        help='initial | incremental | backfill | backfill-deals | backfill-pre-court | backfill-court | backfill-history | ringostat-initial | ringostat-incremental | ringostat-backfill',
     )
     parser.add_argument('--date-from', type=date.fromisoformat, help='Начало периода для backfill (YYYY-MM-DD)')
     parser.add_argument('--date-to',   type=date.fromisoformat, help='Конец периода для backfill (YYYY-MM-DD)')
@@ -209,6 +253,14 @@ def main():
         if not args.date_from or not args.date_to:
             parser.error('--date-from and --date-to are required for backfill-history mode')
         run_backfill_history(args.date_from, args.date_to)
+    elif args.mode == 'ringostat-initial':
+        run_ringostat_initial()
+    elif args.mode == 'ringostat-incremental':
+        run_ringostat_incremental()
+    elif args.mode == 'ringostat-backfill':
+        if not args.date_from or not args.date_to:
+            parser.error('--date-from and --date-to are required for ringostat-backfill mode')
+        run_ringostat_backfill(args.date_from, args.date_to)
     else:
         run_incremental()
 
