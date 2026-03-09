@@ -1,5 +1,8 @@
+import re
 from datetime import datetime
 from typing import Optional
+
+from dateutil import parser as dtparser
 
 
 def _str(value) -> Optional[str]:
@@ -25,14 +28,27 @@ def _bool_flag(value) -> Optional[bool]:
 
 
 def _parse_dt(value) -> Optional[datetime]:
+    """Парсить дату з будь-яким форматом включно з timezone (+0200)."""
     if not value or str(value).strip() in ('', 'None', 'null', '0000-00-00 00:00:00'):
         return None
-    for fmt in ('%Y-%m-%d %H:%M:%S', '%Y-%m-%dT%H:%M:%S', '%Y-%m-%d'):
-        try:
-            return datetime.strptime(str(value).strip(), fmt)
-        except ValueError:
-            continue
-    return None
+    try:
+        dt = dtparser.parse(str(value).strip())
+        # знімаємо timezone — зберігаємо як naive UTC+2 (локальний час Ringostat)
+        return dt.replace(tzinfo=None)
+    except Exception:
+        return None
+
+
+def _parse_caller(value) -> Optional[str]:
+    """Витягує номер/логін з SIP формату: '"name" <login>' → 'login'."""
+    if not value or str(value).strip() in ('', 'None', 'null'):
+        return None
+    s = str(value).strip()
+    # SIP формат: "Display Name" <sip_number> або просто номер
+    m = re.search(r'<([^>]+)>', s)
+    if m:
+        return m.group(1).strip()
+    return s
 
 
 def transform_call(raw: dict) -> dict:
@@ -41,7 +57,7 @@ def transform_call(raw: dict) -> dict:
         'uniqueid':        _str(raw.get('uniqueid')),
         'calldate':        calldate,
         'call_date':       calldate.date() if calldate else None,
-        'caller':          _str(raw.get('caller')),
+        'caller':          _parse_caller(raw.get('caller')),
         'caller_number':   _str(raw.get('caller_number')),
         'dst':             _str(raw.get('dst')),
         'pool_name':       _str(raw.get('pool_name')),
