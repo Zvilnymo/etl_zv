@@ -12,7 +12,7 @@ logger = get_logger(__name__)
 _UPSERT_SQL = """
     INSERT INTO crm.fact_leads (
         id, status_id, date_create, date_modify, manager_id,
-        source_id, source_description, lead_name,
+        source_id, source_description, utm_source, lead_name,
         taken_in_work_at, time_taken_in_work_sec,
         rejection_reason, is_repeated, total_debt, phone,
         service_type,
@@ -20,7 +20,7 @@ _UPSERT_SQL = """
         etl_loaded_at
     ) VALUES (
         %(id)s, %(status_id)s, %(date_create)s, %(date_modify)s, %(manager_id)s,
-        %(source_id)s, %(source_description)s, %(lead_name)s,
+        %(source_id)s, %(source_description)s, %(utm_source)s, %(lead_name)s,
         %(taken_in_work_at)s, %(time_taken_in_work_sec)s,
         %(rejection_reason)s, %(is_repeated)s, %(total_debt)s, %(phone)s,
         %(service_type)s,
@@ -34,6 +34,7 @@ _UPSERT_SQL = """
         manager_id             = EXCLUDED.manager_id,
         source_id              = EXCLUDED.source_id,
         source_description     = EXCLUDED.source_description,
+        utm_source             = EXCLUDED.utm_source,
         lead_name              = EXCLUDED.lead_name,
         taken_in_work_at       = EXCLUDED.taken_in_work_at,
         time_taken_in_work_sec = EXCLUDED.time_taken_in_work_sec,

@@ -42,7 +42,7 @@ CONTRACT_TYPE_MAP = {
 # Поля для выгрузки лидов
 LEAD_SELECT_FIELDS = [
     'ID', 'STATUS_ID', 'DATE_CREATE', 'DATE_MODIFY',
-    'ASSIGNED_BY_ID', 'SOURCE_ID', 'SOURCE_DESCRIPTION',
+    'ASSIGNED_BY_ID', 'SOURCE_ID', 'SOURCE_DESCRIPTION', 'UTM_SOURCE',
     'NAME',                             # lead_name
     'PHONE',
     'UF_CRM_1745414446',                # taken_in_work_at

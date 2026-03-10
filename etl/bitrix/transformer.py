@@ -114,6 +114,7 @@ def transform_lead(raw: dict) -> dict:
         'manager_id':             _parse_int(raw.get('ASSIGNED_BY_ID')),
         'source_id':              raw.get('SOURCE_ID') or None,
         'source_description':     raw.get('SOURCE_DESCRIPTION') or None,
+        'utm_source':             raw.get('UTM_SOURCE') or None,
         'lead_name':              raw.get('NAME') or None,
         'taken_in_work_at':       taken_in_work_at,
         'time_taken_in_work_sec': calculate_working_seconds(date_create, taken_in_work_at),
