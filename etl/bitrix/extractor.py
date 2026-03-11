@@ -6,6 +6,7 @@ from config import (
     LEAD_SELECT_FIELDS, DEAL_SELECT_FIELDS, DEALS_CATEGORY_ID,
     PRE_COURT_CATEGORY_ID, PRE_COURT_DEAL_SELECT_FIELDS,
     COURT_CATEGORY_ID, COURT_DEAL_SELECT_FIELDS,
+    INVOICE_SELECT_FIELDS, INVOICE_ENTITY_TYPE_ID,
 )
 from .b24 import B24
 
@@ -119,6 +120,32 @@ def fetch_all_statuses() -> list:
         'crm.status.list',
         select=['STATUS_ID', 'ENTITY_ID', 'NAME', 'SORT', 'SEMANTICS'],
     )
+
+
+# --- Рахунки (Smart Invoice entityTypeId=31) ---
+
+def fetch_invoices(date_from: date, date_to: date) -> list:
+    """Рахунки з updatedTime в діапазоні."""
+    return _deals_client().get_list(
+        'crm.item.list',
+        b24_filter={
+            '>=updatedTime': f'{date_from}T00:00:00',
+            '<=updatedTime': f'{date_to}T23:59:59',
+        },
+        select=INVOICE_SELECT_FIELDS,
+        entity_type_id=INVOICE_ENTITY_TYPE_ID,
+    )
+
+
+def fetch_invoice_stages() -> dict:
+    """Словник {stage_id: stage_name} для Smart Invoice (entityTypeId=31)."""
+    client = _deals_client()
+    try:
+        result = client.call('crm.item.stage.list', {'entityTypeId': INVOICE_ENTITY_TYPE_ID})
+        stages = result if isinstance(result, list) else result.get('stages', [])
+        return {s['statusId']: s.get('name', s['statusId']) for s in stages if s.get('statusId')}
+    except Exception:
+        return {}
 
 
 # --- История стадий ---

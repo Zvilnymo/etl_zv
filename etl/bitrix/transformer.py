@@ -136,6 +136,37 @@ def transform_lead(raw: dict) -> dict:
     }
 
 
+def transform_invoice(raw: dict, stages: dict) -> dict:
+    """stages — словник {stage_id: stage_name} отриманий з fetch_invoice_stages()."""
+    def _parse_money_field(val):
+        if not val:
+            return None
+        try:
+            return _parse_amount(str(val).split('|')[0].strip())
+        except Exception:
+            return None
+
+    stage_id = raw.get('stageId') or None
+    return {
+        'id':                   int(raw['id']),
+        'title':                raw.get('title') or None,
+        'amount':               _parse_amount(raw.get('opportunity')),
+        'stage_id':             stage_id,
+        'stage_name':           stages.get(stage_id) if stage_id else None,
+        'category_id':          _parse_int(raw.get('categoryId')),
+        'deal_id':              _parse_int(raw.get('parentId2')),
+        'contact_id':           _parse_int(raw.get('contactId')),
+        'manager_id':           _parse_int(raw.get('assignedById')),
+        'date_create':          _parse_dt(raw.get('createdTime')),
+        'date_modify':          _parse_dt(raw.get('updatedTime')),
+        'payment_date':         _parse_dt(raw.get('ufCrm_SMART_INVOICE_1706019776210')),
+        'payment_description':  raw.get('ufCrm_SMART_INVOICE_1675859482855') or None,
+        'contract_amount':      _parse_money_field(raw.get('ufCrm_1660164651')),
+        'monthly_payment':      _parse_money_field(raw.get('ufCrm_1660164813')),
+        'payments_count':       _parse_int(raw.get('ufCrm_1660164927')),
+    }
+
+
 def transform_deal(raw: dict) -> dict:
     payments_count = _parse_int(raw.get('UF_CRM_1660164927'))
 

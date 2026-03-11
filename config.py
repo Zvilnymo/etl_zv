@@ -115,6 +115,22 @@ COURT_DEAL_SELECT_FIELDS = [
     'UF_CRM_1660396636',            # delta_60months (money, унікальне поле суду)
 ]
 
+# Smart Invoice (entityTypeId=31) — рахунки/платежі
+INVOICE_ENTITY_TYPE_ID = 31
+INVOICE_SELECT_FIELDS = [
+    'id', 'title', 'opportunity', 'stageId', 'categoryId',
+    'parentId2',                                # deal_id
+    'contactId',
+    'assignedById',
+    'createdTime',
+    'updatedTime',
+    'ufCrm_SMART_INVOICE_1675859482855',        # payment_description
+    'ufCrm_SMART_INVOICE_1706019776210',        # payment_date
+    'ufCrm_1660164651',                         # contract_amount (money)
+    'ufCrm_1660164813',                         # monthly_payment (money)
+    'ufCrm_1660164927',                         # payments_count
+]
+
 # Поля для выгрузки сделок
 DEAL_SELECT_FIELDS = [
     'ID', 'STAGE_ID', 'DATE_CREATE', 'DATE_MODIFY', 'CLOSEDATE',
