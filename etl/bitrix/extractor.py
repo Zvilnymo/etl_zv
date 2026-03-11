@@ -138,14 +138,17 @@ def fetch_invoices(date_from: date, date_to: date) -> list:
 
 
 def fetch_invoice_stages() -> dict:
-    """Словник {stage_id: stage_name} для Smart Invoice (entityTypeId=31)."""
-    client = _deals_client()
-    try:
-        result = client.call('crm.item.stage.list', {'entityTypeId': INVOICE_ENTITY_TYPE_ID})
-        stages = result if isinstance(result, list) else result.get('stages', [])
-        return {s['statusId']: s.get('name', s['statusId']) for s in stages if s.get('statusId')}
-    except Exception:
-        return {}
+    """Словник {stage_id: stage_name} для Smart Invoice (entityTypeId=31).
+    Стадії зберігаються в crm.status.list з ENTITY_ID = 'DYNAMIC_31_X'."""
+    statuses = _deals_client().get_list(
+        'crm.status.list',
+        select=['STATUS_ID', 'ENTITY_ID', 'NAME'],
+    )
+    return {
+        s['STATUS_ID']: s.get('NAME', s['STATUS_ID'])
+        for s in statuses
+        if 'DYNAMIC_31' in str(s.get('ENTITY_ID', ''))
+    }
 
 
 # --- История стадий ---
