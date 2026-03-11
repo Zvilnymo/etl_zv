@@ -117,6 +117,19 @@ COURT_DEAL_SELECT_FIELDS = [
 
 # Smart Invoice (entityTypeId=31) — рахунки/платежі
 INVOICE_ENTITY_TYPE_ID = 31
+
+# Стадії рахунків (захардкожені, crm.item.stage.list не підтримується)
+INVOICE_STAGE_MAP = {
+    'DT31_1:N':          'Чорновик',
+    'DT31_1:UC_842ODN':  'Погодили на відправку',
+    'DT31_1:S':          'Відправлений клієнту',
+    'DT31_1:UC_OH8Y4S':  'Прострочений / Боржник',
+    'DT31_1:UC_H5PPNK':  'Пауза',
+    'DT31_1:UC_WW75SB':  'Оплатили',
+    'DT31_1:UC_FKX3CW':  'Відмова (Пропажа)',
+    'DT31_1:P':          'Оплатили (фінальна)',
+    'DT31_1:D':          'Скасували',
+}
 INVOICE_SELECT_FIELDS = [
     'id', 'title', 'opportunity', 'stageId', 'categoryId',
     'parentId2',                                # deal_id

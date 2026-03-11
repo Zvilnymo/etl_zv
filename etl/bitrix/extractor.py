@@ -6,7 +6,7 @@ from config import (
     LEAD_SELECT_FIELDS, DEAL_SELECT_FIELDS, DEALS_CATEGORY_ID,
     PRE_COURT_CATEGORY_ID, PRE_COURT_DEAL_SELECT_FIELDS,
     COURT_CATEGORY_ID, COURT_DEAL_SELECT_FIELDS,
-    INVOICE_SELECT_FIELDS, INVOICE_ENTITY_TYPE_ID,
+    INVOICE_SELECT_FIELDS, INVOICE_ENTITY_TYPE_ID, INVOICE_STAGE_MAP,
 )
 from .b24 import B24
 
@@ -138,17 +138,8 @@ def fetch_invoices(date_from: date, date_to: date) -> list:
 
 
 def fetch_invoice_stages() -> dict:
-    """Словник {stage_id: stage_name} для Smart Invoice (entityTypeId=31).
-    Стадії зберігаються в crm.status.list з ENTITY_ID = 'DYNAMIC_31_X'."""
-    statuses = _deals_client().get_list(
-        'crm.status.list',
-        select=['STATUS_ID', 'ENTITY_ID', 'NAME'],
-    )
-    return {
-        s['STATUS_ID']: s.get('NAME', s['STATUS_ID'])
-        for s in statuses
-        if 'DYNAMIC_31' in str(s.get('ENTITY_ID', ''))
-    }
+    """Словник {stage_id: stage_name} — захардкожений, бо crm.item.stage.list не підтримується."""
+    return INVOICE_STAGE_MAP
 
 
 # --- История стадий ---
