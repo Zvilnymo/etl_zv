@@ -125,8 +125,8 @@ def fetch_all_statuses() -> list:
 # --- Рахунки (Smart Invoice entityTypeId=31) ---
 
 def fetch_invoices(date_from: date, date_to: date) -> list:
-    """Рахунки з updatedTime в діапазоні."""
-    return _deals_client().get_list(
+    """Рахунки змінені АБО створені в діапазоні (дедуплікація по id)."""
+    updated = _deals_client().get_list(
         'crm.item.list',
         b24_filter={
             '>=updatedTime': f'{date_from}T00:00:00',
@@ -135,6 +135,17 @@ def fetch_invoices(date_from: date, date_to: date) -> list:
         select=INVOICE_SELECT_FIELDS,
         entity_type_id=INVOICE_ENTITY_TYPE_ID,
     )
+    created = _deals_client().get_list(
+        'crm.item.list',
+        b24_filter={
+            '>=createdTime': f'{date_from}T00:00:00',
+            '<=createdTime': f'{date_to}T23:59:59',
+        },
+        select=INVOICE_SELECT_FIELDS,
+        entity_type_id=INVOICE_ENTITY_TYPE_ID,
+    )
+    seen = {r['id'] for r in updated}
+    return updated + [r for r in created if r['id'] not in seen]
 
 
 def fetch_invoice_stages() -> dict:
