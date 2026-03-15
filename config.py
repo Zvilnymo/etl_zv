@@ -137,7 +137,7 @@ INVOICE_SELECT_FIELDS = [
     'assignedById',
     'createdTime',
     'updatedTime',
-    'beginDate',                                # invoice_date (Дата виставлення)
+    'begindate',                                # invoice_date (Дата виставлення)
     'ufCrm_SMART_INVOICE_1675859482855',        # payment_description
     'ufCrm_SMART_INVOICE_1706019776210',        # payment_date (фактична оплата)
     'ufCrm_1660164651',                         # contract_amount (money)

@@ -159,7 +159,7 @@ def transform_invoice(raw: dict, stages: dict) -> dict:
         'manager_id':           _parse_int(raw.get('assignedById')),
         'date_create':          _parse_dt(raw.get('createdTime')),
         'date_modify':          _parse_dt(raw.get('updatedTime')),
-        'invoice_date':         _parse_dt(raw.get('beginDate')),
+        'invoice_date':         _parse_dt(raw.get('begindate')),
         'payment_date':         _parse_dt(raw.get('ufCrm_SMART_INVOICE_1706019776210')),
         'payment_description':  raw.get('ufCrm_SMART_INVOICE_1675859482855') or None,
         'contract_amount':      _parse_money_field(raw.get('ufCrm_1660164651')),
