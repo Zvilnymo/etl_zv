@@ -13,13 +13,13 @@ _UPSERT_SQL = """
     INSERT INTO crm.fact_invoices (
         id, title, amount, stage_id, stage_name, category_id,
         deal_id, contact_id, manager_id,
-        date_create, date_modify, payment_date, payment_description,
+        date_create, date_modify, invoice_date, payment_date, payment_description,
         contract_amount, monthly_payment, payments_count,
         etl_loaded_at
     ) VALUES (
         %(id)s, %(title)s, %(amount)s, %(stage_id)s, %(stage_name)s, %(category_id)s,
         %(deal_id)s, %(contact_id)s, %(manager_id)s,
-        %(date_create)s, %(date_modify)s, %(payment_date)s, %(payment_description)s,
+        %(date_create)s, %(date_modify)s, %(invoice_date)s, %(payment_date)s, %(payment_description)s,
         %(contract_amount)s, %(monthly_payment)s, %(payments_count)s,
         NOW()
     )
@@ -33,6 +33,7 @@ _UPSERT_SQL = """
         contact_id          = EXCLUDED.contact_id,
         manager_id          = EXCLUDED.manager_id,
         date_modify         = EXCLUDED.date_modify,
+        invoice_date        = EXCLUDED.invoice_date,
         payment_date        = EXCLUDED.payment_date,
         payment_description = EXCLUDED.payment_description,
         contract_amount     = EXCLUDED.contract_amount,
