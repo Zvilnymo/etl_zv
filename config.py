@@ -138,6 +138,7 @@ INVOICE_SELECT_FIELDS = [
     'createdTime',
     'updatedTime',
     'begindate',                                # invoice_date (Дата виставлення)
+    'movedTime',                                # moved_time (Дата зміни етапу)
     'ufCrm_SMART_INVOICE_1675859482855',        # payment_description
     'ufCrm_SMART_INVOICE_1706019776210',        # payment_date (фактична оплата)
     'ufCrm_1660164651',                         # contract_amount (money)
