@@ -192,7 +192,7 @@ def run_invoices_backfill(date_from: date, date_to: date):
 
 
 def run_backfill_dosudove(date_from: date, date_to: date):
-    """Дозагрузка досудового врегулювання: угоди + гарантійні листи + кредитори, помісячно."""
+    """Дозагрузка досудового врегулювання: угоди + ГЛ + кредитори + історія стадій, помісячно."""
     logger.info(f'=== BACKFILL DOSUDOVE: {date_from} → {date_to} ===')
 
     current = date_from
@@ -208,6 +208,9 @@ def run_backfill_dosudove(date_from: date, date_to: date):
 
         res = dosudove_creditors_etl.run(current, batch_end)
         _log_run('dosudove_creditors', 'dosudove-backfill', current, batch_end, res)
+
+        res = stage_history_etl.run(current, batch_end)
+        _log_run('stage_history', 'dosudove-backfill', current, batch_end, res)
 
         current = current + relativedelta(months=1)
 
