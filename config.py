@@ -30,6 +30,7 @@ INITIAL_LOAD_FROM       = date(2024, 1, 1)
 DEALS_CATEGORY_ID       = 0     # воронка продаж (category 0)
 PRE_COURT_CATEGORY_ID   = 1     # воронка "Підготовка до суду" (category 1)
 COURT_CATEGORY_ID       = 2     # воронка "Суд" (category 2)
+DOSUDOVE_CATEGORY_ID    = 7     # воронка "Досудове врегулювання" (category 7)
 WORK_START_HOUR         = 9     # начало рабочего дня для расчёта времени реакции
 WORK_END_HOUR           = 21    # конец рабочего дня
 
@@ -113,6 +114,56 @@ COURT_DEAL_SELECT_FIELDS = [
     'UF_CRM_1751895751',            # deal_comment
     'UF_CRM_1733737682868',         # debt_to_write_off (унікальне поле суду)
     'UF_CRM_1660396636',            # delta_60months (money, унікальне поле суду)
+]
+
+# Поля для виванатаження угод воронки "Досудове врегулювання" (category 7)
+DOSUDOVE_DEAL_SELECT_FIELDS = [
+    'ID', 'STAGE_ID', 'DATE_CREATE', 'DATE_MODIFY', 'CLOSEDATE', 'BEGINDATE',
+    'ASSIGNED_BY_ID', 'OPPORTUNITY', 'SOURCE_ID',
+    'LEAD_ID', 'CONTACT_ID',
+    'IS_RETURN_CUSTOMER',
+    'UF_CRM_62F6731E2FFAF',         # total_debt
+    'UF_CRM_1660164651',             # credit_body (money)
+    'UF_CRM_1660164813',             # monthly_payment (money)
+    'UF_CRM_1660164927',             # payments_count
+    'UF_CRM_62F1495FA8BAB',          # creditors_count
+    'UF_CRM_1751895751',             # deal_comment
+    'UF_CRM_1675855655007',          # contract_number
+    # Due diligence (8 булевих питань)
+    'UF_CRM_6523A3F62AC81',          # qual_spouse_income
+    'UF_CRM_6523A3F8BB2C0',          # qual_spouse_assets
+    'UF_CRM_6523A3FAE18BF',          # qual_client_assets
+    'UF_CRM_6523A3FF4B505',          # qual_property_deal
+    'UF_CRM_6523A402B65A6',          # qual_criminal
+    'UF_CRM_6523A406A14CA',          # qual_gambling
+    'UF_CRM_6523A40AA7FFF',          # qual_entrepreneur
+    'UF_CRM_6524060C7730A',          # qual_marriage_property
+]
+
+# Гарантійні листи (Smart Process entityTypeId=1042)
+GL_ENTITY_TYPE_ID = 1042
+GL_SELECT_FIELDS = [
+    'id', 'title', 'createdTime', 'updatedTime', 'createdBy', 'parentId2',
+    'ufCrm11_1750708787',            # date_received (дата отримання ГЛ)
+    'ufCrm11_1750708872',            # creditor_ref_id (crm reference → entityTypeId=155)
+    'ufCrm11_1753374261',            # credit_body
+    'ufCrm11_1753374328',            # guarantee_amount (сума ГЛ)
+    'ufCrm11_1753374357',            # comment
+    'ufCrm11_1765875588631',         # is_paid
+]
+
+# Список кредиторів клієнта (Smart Process entityTypeId=156)
+DOSUDOVE_CREDITOR_ENTITY_TYPE_ID = 156
+DOSUDOVE_CREDITOR_SELECT_FIELDS = [
+    'id', 'title', 'createdTime', 'updatedTime', 'parentId2',
+    'ufCrm5_1663676172',             # creditor_ref_id (crm reference)
+    'ufCrm5_1664191708023',          # creditor_name (string)
+    'ufCrm5_1664194148',             # credit_body (string/numeric)
+    'ufCrm5_1664194203',             # total_debt (money)
+    'ufCrm5_1664193642',             # ubki_debt (money)
+    'ufCrm5_1664193808',             # contract_date (date)
+    'ufCrm5_1664193821',             # contract_number (string)
+    'ufCrm5_1664193833',             # credit_type (string)
 ]
 
 # Smart Invoice (entityTypeId=31) — рахунки/платежі

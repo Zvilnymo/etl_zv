@@ -6,6 +6,9 @@ from config import (
     LEAD_SELECT_FIELDS, DEAL_SELECT_FIELDS, DEALS_CATEGORY_ID,
     PRE_COURT_CATEGORY_ID, PRE_COURT_DEAL_SELECT_FIELDS,
     COURT_CATEGORY_ID, COURT_DEAL_SELECT_FIELDS,
+    DOSUDOVE_CATEGORY_ID, DOSUDOVE_DEAL_SELECT_FIELDS,
+    GL_ENTITY_TYPE_ID, GL_SELECT_FIELDS,
+    DOSUDOVE_CREDITOR_ENTITY_TYPE_ID, DOSUDOVE_CREDITOR_SELECT_FIELDS,
     INVOICE_SELECT_FIELDS, INVOICE_ENTITY_TYPE_ID, INVOICE_STAGE_MAP,
 )
 from .b24 import B24
@@ -76,6 +79,69 @@ def fetch_court_deals(date_from: date, date_to: date) -> list:
         },
         select=COURT_DEAL_SELECT_FIELDS,
     )
+
+
+# --- Досудове врегулювання (category 7) ---
+
+def fetch_dosudove_deals(date_from: date, date_to: date) -> list:
+    """Угоди воронки 'Досудове врегулювання' (category 7) з DATE_MODIFY в діапазоні."""
+    return _deals_client().get_list(
+        'crm.deal.list',
+        b24_filter={
+            'CATEGORY_ID': DOSUDOVE_CATEGORY_ID,
+            '>=DATE_MODIFY': f'{date_from}T00:00:00',
+            '<=DATE_MODIFY': f'{date_to}T23:59:59',
+        },
+        select=DOSUDOVE_DEAL_SELECT_FIELDS,
+    )
+
+
+def fetch_guarantee_letters(date_from: date, date_to: date) -> list:
+    """Гарантійні листи (entityTypeId=1042) змінені АБО створені в діапазоні."""
+    updated = _deals_client().get_list(
+        'crm.item.list',
+        b24_filter={
+            '>=updatedTime': f'{date_from}T00:00:00',
+            '<=updatedTime': f'{date_to}T23:59:59',
+        },
+        select=GL_SELECT_FIELDS,
+        entity_type_id=GL_ENTITY_TYPE_ID,
+    )
+    created = _deals_client().get_list(
+        'crm.item.list',
+        b24_filter={
+            '>=createdTime': f'{date_from}T00:00:00',
+            '<=createdTime': f'{date_to}T23:59:59',
+        },
+        select=GL_SELECT_FIELDS,
+        entity_type_id=GL_ENTITY_TYPE_ID,
+    )
+    seen = {r['id'] for r in updated}
+    return updated + [r for r in created if r['id'] not in seen]
+
+
+def fetch_dosudove_creditors(date_from: date, date_to: date) -> list:
+    """Список кредиторів клієнта (entityTypeId=156) змінені АБО створені в діапазоні."""
+    updated = _deals_client().get_list(
+        'crm.item.list',
+        b24_filter={
+            '>=updatedTime': f'{date_from}T00:00:00',
+            '<=updatedTime': f'{date_to}T23:59:59',
+        },
+        select=DOSUDOVE_CREDITOR_SELECT_FIELDS,
+        entity_type_id=DOSUDOVE_CREDITOR_ENTITY_TYPE_ID,
+    )
+    created = _deals_client().get_list(
+        'crm.item.list',
+        b24_filter={
+            '>=createdTime': f'{date_from}T00:00:00',
+            '<=createdTime': f'{date_to}T23:59:59',
+        },
+        select=DOSUDOVE_CREDITOR_SELECT_FIELDS,
+        entity_type_id=DOSUDOVE_CREDITOR_ENTITY_TYPE_ID,
+    )
+    seen = {r['id'] for r in updated}
+    return updated + [r for r in created if r['id'] not in seen]
 
 
 # --- Контакти ---

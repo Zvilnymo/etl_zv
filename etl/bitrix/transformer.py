@@ -275,6 +275,76 @@ def transform_court_deal(raw: dict) -> dict:
     }
 
 
+def transform_dosudove_deal(raw: dict) -> dict:
+    """Угода воронки 'Досудове врегулювання' (category 7)."""
+    return {
+        'id':                      int(raw['ID']),
+        'lead_id':                 _parse_int(raw.get('LEAD_ID')),
+        'contact_id':              _parse_int(raw.get('CONTACT_ID')),
+        'stage_id':                raw.get('STAGE_ID'),
+        'date_create':             _parse_dt(raw.get('DATE_CREATE')),
+        'date_modify':             _parse_dt(raw.get('DATE_MODIFY')),
+        'close_date':              _parse_dt(raw.get('CLOSEDATE')),
+        'begin_date':              _parse_dt(raw.get('BEGINDATE')),
+        'manager_id':              _parse_int(raw.get('ASSIGNED_BY_ID')),
+        'opportunity':             _parse_amount(raw.get('OPPORTUNITY')),
+        'source_id':               raw.get('SOURCE_ID') or None,
+        'is_return_customer':      _parse_bool(raw.get('IS_RETURN_CUSTOMER')),
+        'total_debt':              _parse_amount(raw.get('UF_CRM_62F6731E2FFAF')),
+        'credit_body':             _parse_money(raw.get('UF_CRM_1660164651')),
+        'monthly_payment':         _parse_money(raw.get('UF_CRM_1660164813')),
+        'payments_count':          _parse_int(raw.get('UF_CRM_1660164927')),
+        'creditors_count':         _parse_int(raw.get('UF_CRM_62F1495FA8BAB')),
+        'deal_comment':            raw.get('UF_CRM_1751895751') or None,
+        'contract_number':         raw.get('UF_CRM_1675855655007') or None,
+        # Due diligence
+        'qual_spouse_income':      _parse_bool(raw.get('UF_CRM_6523A3F62AC81')),
+        'qual_spouse_assets':      _parse_bool(raw.get('UF_CRM_6523A3F8BB2C0')),
+        'qual_client_assets':      _parse_bool(raw.get('UF_CRM_6523A3FAE18BF')),
+        'qual_property_deal':      _parse_bool(raw.get('UF_CRM_6523A3FF4B505')),
+        'qual_criminal':           _parse_bool(raw.get('UF_CRM_6523A402B65A6')),
+        'qual_gambling':           _parse_bool(raw.get('UF_CRM_6523A406A14CA')),
+        'qual_entrepreneur':       _parse_bool(raw.get('UF_CRM_6523A40AA7FFF')),
+        'qual_marriage_property':  _parse_bool(raw.get('UF_CRM_6524060C7730A')),
+    }
+
+
+def transform_guarantee_letter(raw: dict) -> dict:
+    """Гарантійний лист (entityTypeId=1042)."""
+    return {
+        'id':               int(raw['id']),
+        'title':            raw.get('title') or None,
+        'date_create':      _parse_dt(raw.get('createdTime')),
+        'date_modify':      _parse_dt(raw.get('updatedTime')),
+        'created_by':       _parse_int(raw.get('createdBy')),
+        'deal_id':          _parse_int(raw.get('parentId2')),
+        'date_received':    _parse_dt(raw.get('ufCrm11_1750708787')),
+        'creditor_ref_id':  _parse_int(raw.get('ufCrm11_1750708872')),
+        'credit_body':      _parse_amount(raw.get('ufCrm11_1753374261')),
+        'guarantee_amount': _parse_amount(raw.get('ufCrm11_1753374328')),
+        'comment':          raw.get('ufCrm11_1753374357') or None,
+        'is_paid':          _parse_bool(raw.get('ufCrm11_1765875588631')),
+    }
+
+
+def transform_dosudove_creditor(raw: dict) -> dict:
+    """Кредитор клієнта по досудовій угоді (entityTypeId=156)."""
+    return {
+        'id':               int(raw['id']),
+        'deal_id':          _parse_int(raw.get('parentId2')),
+        'date_create':      _parse_dt(raw.get('createdTime')),
+        'date_modify':      _parse_dt(raw.get('updatedTime')),
+        'creditor_ref_id':  _parse_int(raw.get('ufCrm5_1663676172')),
+        'creditor_name':    raw.get('ufCrm5_1664191708023') or None,
+        'credit_body':      _parse_amount(raw.get('ufCrm5_1664194148')),
+        'total_debt':       _parse_money(raw.get('ufCrm5_1664194203')),
+        'ubki_debt':        _parse_money(raw.get('ufCrm5_1664193642')),
+        'contract_date':    _parse_dt(raw.get('ufCrm5_1664193808')),
+        'contract_number':  raw.get('ufCrm5_1664193821') or None,
+        'credit_type':      raw.get('ufCrm5_1664193833') or None,
+    }
+
+
 def transform_pre_court_deal(raw: dict) -> dict:
     return {
         'id':                int(raw['ID']),

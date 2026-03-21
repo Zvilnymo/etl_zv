@@ -20,7 +20,7 @@ from datetime import date, timedelta
 from dateutil.relativedelta import relativedelta
 
 from db.connection import get_conn, release_conn
-from etl.bitrix import dimensions_etl, leads_etl, deals_etl, stage_history_etl, pre_court_deals_etl, court_deals_etl, contacts_etl, invoices_etl
+from etl.bitrix import dimensions_etl, leads_etl, deals_etl, stage_history_etl, pre_court_deals_etl, court_deals_etl, contacts_etl, invoices_etl, dosudove_deals_etl, guarantee_letters_etl, dosudove_creditors_etl
 from etl.ringostat import calls_etl as ringostat_calls_etl
 from utils.logger import get_logger
 from config import INITIAL_LOAD_FROM
@@ -86,6 +86,15 @@ def run_incremental():
 
     res = invoices_etl.run(yesterday, today)
     _log_run('invoices', 'incremental', yesterday, today, res)
+
+    res = dosudove_deals_etl.run(yesterday, today)
+    _log_run('dosudove_deals', 'incremental', yesterday, today, res)
+
+    res = guarantee_letters_etl.run(yesterday, today)
+    _log_run('guarantee_letters', 'incremental', yesterday, today, res)
+
+    res = dosudove_creditors_etl.run(yesterday, today)
+    _log_run('dosudove_creditors', 'incremental', yesterday, today, res)
 
     logger.info('=== INCREMENTAL DONE ===')
 
@@ -182,6 +191,29 @@ def run_invoices_backfill(date_from: date, date_to: date):
     logger.info('=== INVOICES BACKFILL DONE ===')
 
 
+def run_backfill_dosudove(date_from: date, date_to: date):
+    """Дозагрузка досудового врегулювання: угоди + гарантійні листи + кредитори, помісячно."""
+    logger.info(f'=== BACKFILL DOSUDOVE: {date_from} → {date_to} ===')
+
+    current = date_from
+    while current <= date_to:
+        batch_end = min(current + relativedelta(months=1) - timedelta(days=1), date_to)
+        logger.info(f'Dosudove batch: {current} → {batch_end}')
+
+        res = dosudove_deals_etl.run(current, batch_end)
+        _log_run('dosudove_deals', 'dosudove-backfill', current, batch_end, res)
+
+        res = guarantee_letters_etl.run(current, batch_end)
+        _log_run('guarantee_letters', 'dosudove-backfill', current, batch_end, res)
+
+        res = dosudove_creditors_etl.run(current, batch_end)
+        _log_run('dosudove_creditors', 'dosudove-backfill', current, batch_end, res)
+
+        current = current + relativedelta(months=1)
+
+    logger.info('=== BACKFILL DOSUDOVE DONE ===')
+
+
 def run_ringostat_initial():
     """Повна загрузка дзвінків з INITIAL_LOAD_FROM по сьогодні, помісячно."""
     logger.info(f'=== RINGOSTAT INITIAL from {INITIAL_LOAD_FROM} ===')
@@ -242,7 +274,7 @@ def main():
             'initial', 'incremental', 'backfill',
             'backfill-deals', 'backfill-pre-court', 'backfill-court', 'backfill-history',
             'ringostat-initial', 'ringostat-incremental', 'ringostat-backfill',
-            'invoices-backfill',
+            'invoices-backfill', 'dosudove-backfill',
         ],
         default='incremental',
         help='initial | incremental | backfill | ... | invoices-backfill',
@@ -285,6 +317,10 @@ def main():
         if not args.date_from or not args.date_to:
             parser.error('--date-from and --date-to are required for invoices-backfill mode')
         run_invoices_backfill(args.date_from, args.date_to)
+    elif args.mode == 'dosudove-backfill':
+        if not args.date_from or not args.date_to:
+            parser.error('--date-from and --date-to are required for dosudove-backfill mode')
+        run_backfill_dosudove(args.date_from, args.date_to)
     else:
         run_incremental()
 
