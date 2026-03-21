@@ -328,13 +328,15 @@ def transform_guarantee_letter(raw: dict) -> dict:
 
 
 def transform_dosudove_creditor(raw: dict) -> dict:
-    """Кредитор клієнта по досудовій угоді (entityTypeId=156)."""
+    """Кредитор клієнта (entityTypeId=156).
+    Прив'язаний до контакту (contactId), кредитор з довідника через parentId155.
+    """
     return {
         'id':               int(raw['id']),
-        'deal_id':          _parse_int(raw.get('parentId2')),
+        'contact_id':       _parse_int(raw.get('contactId')),
         'date_create':      _parse_dt(raw.get('createdTime')),
         'date_modify':      _parse_dt(raw.get('updatedTime')),
-        'creditor_ref_id':  _parse_int(raw.get('ufCrm5_1663676172')),
+        'creditor_ref_id':  _parse_int(raw.get('parentId155')),
         'creditor_name':    raw.get('ufCrm5_1664191708023') or None,
         'credit_body':      _parse_amount(raw.get('ufCrm5_1664194148')),
         'total_debt':       _parse_money(raw.get('ufCrm5_1664194203')),

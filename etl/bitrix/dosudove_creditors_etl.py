@@ -11,18 +11,18 @@ logger = get_logger(__name__)
 
 _UPSERT_SQL = """
     INSERT INTO crm.fact_dosudove_creditors (
-        id, deal_id, date_create, date_modify,
+        id, contact_id, date_create, date_modify,
         creditor_ref_id, creditor_name, credit_body,
         total_debt, ubki_debt, contract_date,
         contract_number, credit_type, etl_loaded_at
     ) VALUES (
-        %(id)s, %(deal_id)s, %(date_create)s, %(date_modify)s,
+        %(id)s, %(contact_id)s, %(date_create)s, %(date_modify)s,
         %(creditor_ref_id)s, %(creditor_name)s, %(credit_body)s,
         %(total_debt)s, %(ubki_debt)s, %(contract_date)s,
         %(contract_number)s, %(credit_type)s, NOW()
     )
     ON CONFLICT (id) DO UPDATE SET
-        deal_id         = EXCLUDED.deal_id,
+        contact_id      = EXCLUDED.contact_id,
         date_modify     = EXCLUDED.date_modify,
         creditor_ref_id = EXCLUDED.creditor_ref_id,
         creditor_name   = EXCLUDED.creditor_name,

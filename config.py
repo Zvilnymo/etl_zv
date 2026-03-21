@@ -155,8 +155,7 @@ GL_SELECT_FIELDS = [
 # Список кредиторів клієнта (Smart Process entityTypeId=156)
 DOSUDOVE_CREDITOR_ENTITY_TYPE_ID = 156
 DOSUDOVE_CREDITOR_SELECT_FIELDS = [
-    'id', 'title', 'createdTime', 'updatedTime', 'parentId2',
-    'ufCrm5_1663676172',             # creditor_ref_id (crm reference)
+    'id', 'title', 'createdTime', 'updatedTime', 'contactId', 'parentId155',
     'ufCrm5_1664191708023',          # creditor_name (string)
     'ufCrm5_1664194148',             # credit_body (string/numeric)
     'ufCrm5_1664194203',             # total_debt (money)
