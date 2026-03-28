@@ -1,6 +1,10 @@
 import os
 from datetime import date
 
+# --- TikTok Ads ---
+TIKTOK_ACCESS_TOKEN  = os.environ['TIKTOK_ACCESS_TOKEN']
+TIKTOK_ADVERTISER_ID = os.environ['TIKTOK_ADVERTISER_ID']
+
 # --- Ringostat ---
 RINGOSTAT_AUTH_KEY  = os.environ['RINGOSTAT_AUTH_KEY']
 RINGOSTAT_PROJECT_ID = os.environ.get('RINGOSTAT_PROJECT_ID', '221472')

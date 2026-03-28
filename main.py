@@ -22,6 +22,8 @@ from dateutil.relativedelta import relativedelta
 from db.connection import get_conn, release_conn
 from etl.bitrix import dimensions_etl, leads_etl, deals_etl, stage_history_etl, pre_court_deals_etl, court_deals_etl, contacts_etl, invoices_etl, dosudove_deals_etl, guarantee_letters_etl, dosudove_creditors_etl
 from etl.ringostat import calls_etl as ringostat_calls_etl
+from etl.tiktok import campaigns_etl as tiktok_campaigns_etl
+from etl.tiktok import daily_stats_etl as tiktok_daily_stats_etl
 from utils.logger import get_logger
 from config import INITIAL_LOAD_FROM
 
@@ -95,6 +97,12 @@ def run_incremental():
 
     res = dosudove_creditors_etl.run(yesterday, today)
     _log_run('dosudove_creditors', 'incremental', yesterday, today, res)
+
+    res = tiktok_campaigns_etl.run()
+    _log_run('tiktok_campaigns', 'incremental', yesterday, today, res)
+
+    res = tiktok_daily_stats_etl.run(yesterday, today)
+    _log_run('tiktok_daily_stats', 'incremental', yesterday, today, res)
 
     logger.info('=== INCREMENTAL DONE ===')
 
@@ -250,6 +258,26 @@ def run_ringostat_backfill(date_from: date, date_to: date):
     logger.info('=== RINGOSTAT BACKFILL DONE ===')
 
 
+def run_tiktok_backfill(date_from: date, date_to: date):
+    """Повна загрузка TikTok статистики за довільний діапазон."""
+    logger.info(f'=== TIKTOK BACKFILL: {date_from} → {date_to} ===')
+
+    res = tiktok_campaigns_etl.run()
+    _log_run('tiktok_campaigns', 'tiktok-backfill', date_from, date_to, res)
+
+    # TikTok дозволяє максимум 30 днів за один запит
+    from dateutil.relativedelta import relativedelta
+    current = date_from
+    while current <= date_to:
+        batch_end = min(current + relativedelta(days=29), date_to)
+        logger.info(f'TikTok batch: {current} → {batch_end}')
+        res = tiktok_daily_stats_etl.run(current, batch_end)
+        _log_run('tiktok_daily_stats', 'tiktok-backfill', current, batch_end, res)
+        current = batch_end + timedelta(days=1)
+
+    logger.info('=== TIKTOK BACKFILL DONE ===')
+
+
 def run_backfill_history(date_from: date, date_to: date):
     """Дозагрузка только истории стадий (без лидов и сделок), помесячно.
     Используется для наполнения fact_pre_court_stage_history и fact_court_stage_history."""
@@ -275,6 +303,7 @@ def main():
             'backfill-deals', 'backfill-pre-court', 'backfill-court', 'backfill-history',
             'ringostat-initial', 'ringostat-incremental', 'ringostat-backfill',
             'invoices-backfill', 'dosudove-backfill',
+            'tiktok-backfill',
         ],
         default='incremental',
         help='initial | incremental | backfill | ... | invoices-backfill',
@@ -321,6 +350,10 @@ def main():
         if not args.date_from or not args.date_to:
             parser.error('--date-from and --date-to are required for dosudove-backfill mode')
         run_backfill_dosudove(args.date_from, args.date_to)
+    elif args.mode == 'tiktok-backfill':
+        if not args.date_from or not args.date_to:
+            parser.error('--date-from and --date-to are required for tiktok-backfill mode')
+        run_tiktok_backfill(args.date_from, args.date_to)
     else:
         run_incremental()
 
