@@ -18,7 +18,6 @@ _UPSERT_SQL = """
         video_play_actions, video_watched_2s, video_watched_6s,
         video_views_p25, video_views_p50, video_views_p75, video_views_p100,
         likes, comments, shares, follows,
-        conversions, cost_per_conversion, conversion_rate,
         etl_loaded_at
     ) VALUES (
         %(campaign_id)s, %(campaign_name)s, %(stat_date)s,
@@ -27,7 +26,6 @@ _UPSERT_SQL = """
         %(video_play_actions)s, %(video_watched_2s)s, %(video_watched_6s)s,
         %(video_views_p25)s, %(video_views_p50)s, %(video_views_p75)s, %(video_views_p100)s,
         %(likes)s, %(comments)s, %(shares)s, %(follows)s,
-        %(conversions)s, %(cost_per_conversion)s, %(conversion_rate)s,
         NOW()
     )
     ON CONFLICT (campaign_id, stat_date) DO UPDATE SET
@@ -51,9 +49,6 @@ _UPSERT_SQL = """
         comments            = EXCLUDED.comments,
         shares              = EXCLUDED.shares,
         follows             = EXCLUDED.follows,
-        conversions         = EXCLUDED.conversions,
-        cost_per_conversion = EXCLUDED.cost_per_conversion,
-        conversion_rate     = EXCLUDED.conversion_rate,
         etl_loaded_at       = NOW();
 """
 

@@ -42,7 +42,6 @@ def fetch_daily_stats(advertiser_id: str, date_from: str, date_to: str) -> list:
         'video_play_actions', 'video_watched_2s', 'video_watched_6s',
         'video_views_p25', 'video_views_p50', 'video_views_p75', 'video_views_p100',
         'likes', 'comments', 'shares', 'follows',
-        'conversions', 'cost_per_conversion', 'conversion_rate',
     ]
     results = []
     page = 1

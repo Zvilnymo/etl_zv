@@ -57,7 +57,4 @@ def transform_daily_stat(raw: dict, campaign_name_map: dict) -> dict:
         'comments':             _int(metrics.get('comments')),
         'shares':               _int(metrics.get('shares')),
         'follows':              _int(metrics.get('follows')),
-        'conversions':          _int(metrics.get('conversions')),
-        'cost_per_conversion':  _num(metrics.get('cost_per_conversion')),
-        'conversion_rate':      _num(metrics.get('conversion_rate')),
     }
