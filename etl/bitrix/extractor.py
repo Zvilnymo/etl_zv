@@ -188,6 +188,12 @@ def fetch_all_statuses() -> list:
     )
 
 
+def fetch_contract_type_items() -> list:
+    """Елементи enum-поля Тип договору (UF_CRM_1695636781) з crm.deal.fields."""
+    fields = _deals_client().call('crm.deal.fields')
+    return fields.get('UF_CRM_1695636781', {}).get('items', [])
+
+
 # --- Рахунки (Smart Invoice entityTypeId=31) ---
 
 def fetch_invoices(date_from: date, date_to: date) -> list:
