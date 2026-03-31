@@ -3,7 +3,7 @@ from typing import Optional
 
 import pandas as pd
 
-from config import CONTRACT_TYPE_MAP, WORK_START_HOUR, WORK_END_HOUR
+from config import WORK_START_HOUR, WORK_END_HOUR
 
 
 # --- Helpers ---
@@ -172,8 +172,7 @@ def transform_invoice(raw: dict, stages: dict) -> dict:
 def transform_deal(raw: dict) -> dict:
     payments_count = _parse_int(raw.get('UF_CRM_1660164927'))
 
-    type_raw      = str(raw.get('UF_CRM_1695636781') or '').strip()
-    type_contract = CONTRACT_TYPE_MAP.get(type_raw, type_raw or None)
+    type_contract = str(raw.get('UF_CRM_1695636781') or '').strip() or None
 
     return {
         'id':                int(raw['ID']),
