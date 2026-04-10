@@ -37,8 +37,12 @@ _UPSERT_SQL = """
 
 
 def _get_client() -> gspread.Client:
-    creds_json = os.environ['GOOGLE_SHEETS_CREDENTIALS']
-    creds_dict = json.loads(creds_json)
+    secret_file = '/etc/secrets/GOOGLE_SHEETS_CREDENTIALS'
+    if os.path.exists(secret_file):
+        with open(secret_file) as f:
+            creds_dict = json.load(f)
+    else:
+        creds_dict = json.loads(os.environ['GOOGLE_SHEETS_CREDENTIALS'])
     creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
     return gspread.authorize(creds)
 
