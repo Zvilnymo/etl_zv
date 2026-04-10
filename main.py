@@ -24,6 +24,7 @@ from etl.bitrix import dimensions_etl, leads_etl, deals_etl, stage_history_etl, 
 from etl.ringostat import calls_etl as ringostat_calls_etl
 from etl.tiktok import campaigns_etl as tiktok_campaigns_etl
 from etl.tiktok import daily_stats_etl as tiktok_daily_stats_etl
+from etl.gsheets import plans_etl as gsheets_plans_etl
 from utils.logger import get_logger
 from config import INITIAL_LOAD_FROM
 
@@ -103,6 +104,9 @@ def run_incremental():
 
     res = tiktok_daily_stats_etl.run(yesterday, today)
     _log_run('tiktok_daily_stats', 'incremental', yesterday, today, res)
+
+    res = gsheets_plans_etl.run()
+    _log_run('gsheets_plans', 'incremental', yesterday, today, res)
 
     logger.info('=== INCREMENTAL DONE ===')
 
