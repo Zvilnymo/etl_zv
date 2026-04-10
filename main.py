@@ -13,6 +13,7 @@
   python main.py --mode ringostat-initial                                                    # загрузка всех звонков с 2024-01-01
   python main.py --mode ringostat-incremental                                                # ежедневный инкремент звонков
   python main.py --mode ringostat-backfill --date-from 2025-01-01 --date-to 2025-12-31     # звонки за произвольный период
+  python main.py --mode gsheets                                                              # тільки Google Sheets → manager_plans_weekly
 """
 import argparse
 from datetime import date, timedelta
@@ -298,6 +299,18 @@ def run_backfill_history(date_from: date, date_to: date):
     logger.info('=== BACKFILL HISTORY DONE ===')
 
 
+def run_gsheets():
+    logger.info('=== GSHEETS PLANS ===')
+    res = gsheets_plans_etl.run()
+    today = date.today()
+    _log_run('gsheets_plans', 'gsheets', today, today, res)
+    if res['status'] == 'error':
+        logger.error(f'GSheets plans failed: {res["error"]}')
+    else:
+        logger.info(f'GSheets plans: upserted {res["records_upserted"]}')
+    logger.info('=== GSHEETS PLANS DONE ===')
+
+
 def main():
     parser = argparse.ArgumentParser(description='Bitrix24 → PostgreSQL ETL')
     parser.add_argument(
@@ -308,9 +321,10 @@ def main():
             'ringostat-initial', 'ringostat-incremental', 'ringostat-backfill',
             'invoices-backfill', 'dosudove-backfill',
             'tiktok-backfill',
+            'gsheets',
         ],
         default='incremental',
-        help='initial | incremental | backfill | ... | invoices-backfill',
+        help='initial | incremental | backfill | ... | gsheets',
     )
     parser.add_argument('--date-from', type=date.fromisoformat, help='Начало периода для backfill (YYYY-MM-DD)')
     parser.add_argument('--date-to',   type=date.fromisoformat, help='Конец периода для backfill (YYYY-MM-DD)')
@@ -358,6 +372,8 @@ def main():
         if not args.date_from or not args.date_to:
             parser.error('--date-from and --date-to are required for tiktok-backfill mode')
         run_tiktok_backfill(args.date_from, args.date_to)
+    elif args.mode == 'gsheets':
+        run_gsheets()
     else:
         run_incremental()
 
