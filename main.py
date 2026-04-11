@@ -26,6 +26,7 @@ from etl.ringostat import calls_etl as ringostat_calls_etl
 from etl.tiktok import campaigns_etl as tiktok_campaigns_etl
 from etl.tiktok import daily_stats_etl as tiktok_daily_stats_etl
 from etl.gsheets import plans_etl as gsheets_plans_etl
+from etl.gsheets import dosudove_plans_etl as gsheets_dosudove_plans_etl
 from utils.logger import get_logger
 from config import INITIAL_LOAD_FROM
 
@@ -108,6 +109,9 @@ def run_incremental():
 
     res = gsheets_plans_etl.run()
     _log_run('gsheets_plans', 'incremental', yesterday, today, res)
+
+    res = gsheets_dosudove_plans_etl.run()
+    _log_run('gsheets_dosudove_plans', 'incremental', yesterday, today, res)
 
     logger.info('=== INCREMENTAL DONE ===')
 
@@ -300,15 +304,25 @@ def run_backfill_history(date_from: date, date_to: date):
 
 
 def run_gsheets():
+    today = date.today()
+
     logger.info('=== GSHEETS PLANS ===')
     res = gsheets_plans_etl.run()
-    today = date.today()
     _log_run('gsheets_plans', 'gsheets', today, today, res)
     if res['status'] == 'error':
         logger.error(f'GSheets plans failed: {res["error"]}')
     else:
         logger.info(f'GSheets plans: upserted {res["records_upserted"]}')
-    logger.info('=== GSHEETS PLANS DONE ===')
+
+    logger.info('=== GSHEETS DOSUDOVE PLANS ===')
+    res = gsheets_dosudove_plans_etl.run()
+    _log_run('gsheets_dosudove_plans', 'gsheets', today, today, res)
+    if res['status'] == 'error':
+        logger.error(f'GSheets dosudove plans failed: {res["error"]}')
+    else:
+        logger.info(f'GSheets dosudove plans: upserted {res["records_upserted"]}')
+
+    logger.info('=== GSHEETS DONE ===')
 
 
 def main():
