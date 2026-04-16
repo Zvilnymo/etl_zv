@@ -82,4 +82,5 @@ def transform_call(raw: dict) -> dict:
         'refferrer':       _str(raw.get('refferrer')),
         'recording':       _str(raw.get('recording')),
         'has_recording':   _bool_flag(raw.get('has_recording')),
+        'csat_rating':     _int(raw.get('csat_rating')),
     }

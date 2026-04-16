@@ -20,6 +20,7 @@ _UPSERT_SQL = """
         employee_number, employee_fio, department,
         scheme_name, connected_with,
         landing, refferrer, recording, has_recording,
+        csat_rating,
         etl_loaded_at
     ) VALUES (
         %(uniqueid)s, %(calldate)s, %(call_date)s,
@@ -31,6 +32,7 @@ _UPSERT_SQL = """
         %(employee_number)s, %(employee_fio)s, %(department)s,
         %(scheme_name)s, %(connected_with)s,
         %(landing)s, %(refferrer)s, %(recording)s, %(has_recording)s,
+        %(csat_rating)s,
         NOW()
     )
     ON CONFLICT (uniqueid) DO UPDATE SET
@@ -61,6 +63,7 @@ _UPSERT_SQL = """
         refferrer       = EXCLUDED.refferrer,
         recording       = EXCLUDED.recording,
         has_recording   = EXCLUDED.has_recording,
+        csat_rating     = EXCLUDED.csat_rating,
         etl_loaded_at   = NOW();
 """
 

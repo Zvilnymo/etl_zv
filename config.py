@@ -17,6 +17,7 @@ RINGOSTAT_FIELDS = [
     'uniqueid', 'employee_number', 'employee_fio', 'department',
     'scheme_name', 'connected_with', 'landing', 'refferrer',
     'recording', 'has_recording',
+    'csat_rating',
 ]
 
 # --- Bitrix24 ---
