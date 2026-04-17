@@ -25,6 +25,7 @@ from etl.bitrix import dimensions_etl, leads_etl, deals_etl, stage_history_etl, 
 from etl.ringostat import calls_etl as ringostat_calls_etl
 from etl.tiktok import campaigns_etl as tiktok_campaigns_etl
 from etl.tiktok import daily_stats_etl as tiktok_daily_stats_etl
+from etl.meta import daily_stats_etl as meta_daily_stats_etl
 from etl.gsheets import plans_etl as gsheets_plans_etl
 from etl.gsheets import dosudove_plans_etl as gsheets_dosudove_plans_etl
 from utils.logger import get_logger
@@ -106,6 +107,9 @@ def run_incremental():
 
     res = tiktok_daily_stats_etl.run(yesterday, today)
     _log_run('tiktok_daily_stats', 'incremental', yesterday, today, res)
+
+    res = meta_daily_stats_etl.run(yesterday, today)
+    _log_run('meta_daily_stats', 'incremental', yesterday, today, res)
 
     res = gsheets_plans_etl.run()
     _log_run('gsheets_plans', 'incremental', yesterday, today, res)
@@ -303,6 +307,18 @@ def run_backfill_history(date_from: date, date_to: date):
     logger.info('=== BACKFILL HISTORY DONE ===')
 
 
+def run_meta_backfill(date_from: date, date_to: date):
+    logger.info(f'=== META BACKFILL: {date_from} → {date_to} ===')
+    current = date_from
+    while current <= date_to:
+        batch_end = min(current + timedelta(days=29), date_to)
+        logger.info(f'Meta batch: {current} → {batch_end}')
+        res = meta_daily_stats_etl.run(current, batch_end)
+        _log_run('meta_daily_stats', 'meta-backfill', current, batch_end, res)
+        current = batch_end + timedelta(days=1)
+    logger.info('=== META BACKFILL DONE ===')
+
+
 def run_gsheets():
     today = date.today()
 
@@ -335,6 +351,7 @@ def main():
             'ringostat-initial', 'ringostat-incremental', 'ringostat-backfill',
             'invoices-backfill', 'dosudove-backfill',
             'tiktok-backfill',
+            'meta-backfill',
             'gsheets',
         ],
         default='incremental',
@@ -386,6 +403,10 @@ def main():
         if not args.date_from or not args.date_to:
             parser.error('--date-from and --date-to are required for tiktok-backfill mode')
         run_tiktok_backfill(args.date_from, args.date_to)
+    elif args.mode == 'meta-backfill':
+        if not args.date_from or not args.date_to:
+            parser.error('--date-from and --date-to are required for meta-backfill mode')
+        run_meta_backfill(args.date_from, args.date_to)
     elif args.mode == 'gsheets':
         run_gsheets()
     else:

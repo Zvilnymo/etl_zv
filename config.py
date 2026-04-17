@@ -1,6 +1,9 @@
 import os
 from datetime import date
 
+# --- Meta Ads ---
+META_ACCESS_TOKEN  = os.environ['META_ACCESS_TOKEN']
+
 # --- TikTok Ads ---
 TIKTOK_ACCESS_TOKEN  = os.environ['TIKTOK_ACCESS_TOKEN']
 TIKTOK_ADVERTISER_ID = os.environ['TIKTOK_ADVERTISER_ID']
