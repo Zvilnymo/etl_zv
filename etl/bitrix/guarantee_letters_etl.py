@@ -21,6 +21,7 @@ _UPSERT_SQL = """
     )
     ON CONFLICT (id) DO UPDATE SET
         title             = EXCLUDED.title,
+        date_create       = EXCLUDED.date_create,
         date_modify       = EXCLUDED.date_modify,
         deal_id           = EXCLUDED.deal_id,
         date_received     = EXCLUDED.date_received,

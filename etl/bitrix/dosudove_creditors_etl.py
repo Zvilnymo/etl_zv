@@ -23,6 +23,7 @@ _UPSERT_SQL = """
     )
     ON CONFLICT (id) DO UPDATE SET
         contact_id      = EXCLUDED.contact_id,
+        date_create     = EXCLUDED.date_create,
         date_modify     = EXCLUDED.date_modify,
         creditor_ref_id = EXCLUDED.creditor_ref_id,
         creditor_name   = EXCLUDED.creditor_name,

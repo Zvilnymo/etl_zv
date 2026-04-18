@@ -27,6 +27,7 @@ _UPSERT_SQL = """
         lead_id            = EXCLUDED.lead_id,
         contact_id         = EXCLUDED.contact_id,
         stage_id           = EXCLUDED.stage_id,
+        date_create        = EXCLUDED.date_create,
         date_modify        = EXCLUDED.date_modify,
         close_date         = EXCLUDED.close_date,
         manager_id         = EXCLUDED.manager_id,

@@ -30,6 +30,7 @@ _UPSERT_SQL = """
     )
     ON CONFLICT (id) DO UPDATE SET
         status_id              = EXCLUDED.status_id,
+        date_create            = EXCLUDED.date_create,
         date_modify            = EXCLUDED.date_modify,
         manager_id             = EXCLUDED.manager_id,
         source_id              = EXCLUDED.source_id,

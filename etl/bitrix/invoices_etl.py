@@ -32,6 +32,7 @@ _UPSERT_SQL = """
         deal_id             = EXCLUDED.deal_id,
         contact_id          = EXCLUDED.contact_id,
         manager_id          = EXCLUDED.manager_id,
+        date_create         = EXCLUDED.date_create,
         date_modify         = EXCLUDED.date_modify,
         invoice_date        = EXCLUDED.invoice_date,
         payment_date        = EXCLUDED.payment_date,

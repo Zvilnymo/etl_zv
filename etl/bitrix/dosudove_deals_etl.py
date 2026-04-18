@@ -33,6 +33,7 @@ _UPSERT_SQL = """
     )
     ON CONFLICT (id) DO UPDATE SET
         stage_id              = EXCLUDED.stage_id,
+        date_create           = EXCLUDED.date_create,
         date_modify           = EXCLUDED.date_modify,
         close_date            = EXCLUDED.close_date,
         begin_date            = EXCLUDED.begin_date,
