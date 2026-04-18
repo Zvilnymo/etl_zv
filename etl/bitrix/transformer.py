@@ -14,7 +14,7 @@ def _parse_dt(value) -> Optional[datetime]:
     try:
         dt = pd.to_datetime(value)
         if dt.tzinfo is not None:
-            dt = dt.tz_localize(None)
+            dt = dt.tz_convert('UTC').tz_localize(None)
         return dt.to_pydatetime()
     except Exception:
         return None

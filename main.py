@@ -307,6 +307,53 @@ def run_backfill_history(date_from: date, date_to: date):
     logger.info('=== BACKFILL HISTORY DONE ===')
 
 
+def run_bitrix_backfill(date_from: date, date_to: date):
+    """Повний перезапуск всіх Bitrix ETL за діапазон дат."""
+    logger.info(f'=== BITRIX BACKFILL: {date_from} → {date_to} ===')
+
+    res = dimensions_etl.run()
+    _log_run('dimensions', 'bitrix-backfill', date_from, date_to, res)
+
+    current = date_from
+    while current <= date_to:
+        batch_end = min(current + relativedelta(months=1) - timedelta(days=1), date_to)
+        logger.info(f'Bitrix batch: {current} → {batch_end}')
+
+        res = leads_etl.run(current, batch_end)
+        _log_run('leads', 'bitrix-backfill', current, batch_end, res)
+
+        res = contacts_etl.run(current, batch_end)
+        _log_run('contacts', 'bitrix-backfill', current, batch_end, res)
+
+        res = deals_etl.run(current, batch_end)
+        _log_run('deals', 'bitrix-backfill', current, batch_end, res)
+
+        res = pre_court_deals_etl.run(current, batch_end)
+        _log_run('pre_court_deals', 'bitrix-backfill', current, batch_end, res)
+
+        res = court_deals_etl.run(current, batch_end)
+        _log_run('court_deals', 'bitrix-backfill', current, batch_end, res)
+
+        res = stage_history_etl.run(current, batch_end)
+        _log_run('stage_history', 'bitrix-backfill', current, batch_end, res)
+
+        res = invoices_etl.run(current, batch_end)
+        _log_run('invoices', 'bitrix-backfill', current, batch_end, res)
+
+        res = dosudove_deals_etl.run(current, batch_end)
+        _log_run('dosudove_deals', 'bitrix-backfill', current, batch_end, res)
+
+        res = guarantee_letters_etl.run(current, batch_end)
+        _log_run('guarantee_letters', 'bitrix-backfill', current, batch_end, res)
+
+        res = dosudove_creditors_etl.run(current, batch_end)
+        _log_run('dosudove_creditors', 'bitrix-backfill', current, batch_end, res)
+
+        current = current + relativedelta(months=1)
+
+    logger.info('=== BITRIX BACKFILL DONE ===')
+
+
 def run_meta_backfill(date_from: date, date_to: date):
     logger.info(f'=== META BACKFILL: {date_from} → {date_to} ===')
     current = date_from
@@ -352,6 +399,7 @@ def main():
             'invoices-backfill', 'dosudove-backfill',
             'tiktok-backfill',
             'meta-backfill',
+            'bitrix-backfill',
             'gsheets',
         ],
         default='incremental',
@@ -403,6 +451,10 @@ def main():
         if not args.date_from or not args.date_to:
             parser.error('--date-from and --date-to are required for tiktok-backfill mode')
         run_tiktok_backfill(args.date_from, args.date_to)
+    elif args.mode == 'bitrix-backfill':
+        if not args.date_from or not args.date_to:
+            parser.error('--date-from and --date-to are required for bitrix-backfill mode')
+        run_bitrix_backfill(args.date_from, args.date_to)
     elif args.mode == 'meta-backfill':
         if not args.date_from or not args.date_to:
             parser.error('--date-from and --date-to are required for meta-backfill mode')
