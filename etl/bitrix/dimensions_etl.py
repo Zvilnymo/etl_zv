@@ -8,6 +8,7 @@ from .extractor import (
     fetch_users, fetch_all_statuses, fetch_rejection_reason_items,
     fetch_service_type_items, fetch_contract_type_items,
 )
+from .transformer import _clean_name
 
 logger = get_logger(__name__)
 
@@ -27,14 +28,14 @@ def _upsert_managers(conn, users: list) -> int:
     rows = []
     for u in users:
         parts = [u.get('LAST_NAME') or '', u.get('NAME') or '', u.get('SECOND_NAME') or '']
-        full_name = ' '.join(p.strip() for p in parts if p.strip())
+        full_name = _clean_name(' '.join(p.strip() for p in parts if p.strip()))
         active_val = u.get('ACTIVE', 'Y')
         rows.append({
             'id':           int(u['ID']),
             'full_name':    full_name,
-            'name':         u.get('NAME'),
-            'last_name':    u.get('LAST_NAME'),
-            'second_name':  u.get('SECOND_NAME'),
+            'name':         _clean_name(u.get('NAME')),
+            'last_name':    _clean_name(u.get('LAST_NAME')),
+            'second_name':  _clean_name(u.get('SECOND_NAME')),
             'is_active':    str(active_val).upper() in ('Y', 'TRUE', '1'),
         })
     with conn.cursor() as cur:

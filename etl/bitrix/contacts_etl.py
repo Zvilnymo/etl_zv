@@ -3,7 +3,7 @@ from datetime import date, datetime
 from db.connection import get_conn, release_conn
 from utils.logger import get_logger
 from .extractor import fetch_contacts
-from .transformer import _parse_phone
+from .transformer import _parse_phone, _clean_name
 
 logger = get_logger(__name__)
 
@@ -26,7 +26,7 @@ def _transform(raw: dict) -> dict:
         raw.get('NAME') or '',
         raw.get('SECOND_NAME') or '',
     ]
-    full_name = ' '.join(p for p in parts if p).strip() or None
+    full_name = _clean_name(' '.join(p for p in parts if p).strip() or None)
     return {
         'id':        int(raw['ID']),
         'full_name': full_name,

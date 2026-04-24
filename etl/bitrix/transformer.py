@@ -55,6 +55,13 @@ def _parse_bool(value) -> Optional[bool]:
     return str(value).strip().upper() in ('Y', '1', 'TRUE', 'YES')
 
 
+def _clean_name(value: Optional[str]) -> Optional[str]:
+    """Replace ASCII apostrophe with typographic to avoid Looker Studio SQL errors."""
+    if not value:
+        return value
+    return value.replace("'", 'ʼ')
+
+
 def _parse_phone(value) -> Optional[str]:
     """Поле PHONE в Bitrix24 — multi-value список или строка."""
     if not value:
