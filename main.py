@@ -401,6 +401,7 @@ def main():
             'meta-backfill',
             'bitrix-backfill',
             'gsheets',
+            'refresh-dims',
         ],
         default='incremental',
         help='initial | incremental | backfill | ... | gsheets',
@@ -461,6 +462,11 @@ def main():
         run_meta_backfill(args.date_from, args.date_to)
     elif args.mode == 'gsheets':
         run_gsheets()
+    elif args.mode == 'refresh-dims':
+        today = date.today()
+        res = dimensions_etl.run()
+        _log_run('dimensions', 'refresh-dims', today, today, res)
+        logger.info(f'Dimensions refreshed: {res.get("counts")}')
     else:
         run_incremental()
 
