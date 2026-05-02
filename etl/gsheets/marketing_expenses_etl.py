@@ -1,6 +1,10 @@
 """
 ETL: Google Sheets (marketing expenses) → PostgreSQL marketing.fact_marketing_expenses
 
+Парсит лист Google Sheets, где каждый год хранится в отдельной вкладке.
+По умолчанию выбирается лист с текущим годом (`2026`, `2027` и т.д.),
+или можно переопределить имя листа через GOOGLE_SHEET_MARKETING_EXPENSES_NAME.
+
 Парсит сводную таблицу, где:
 - первая строка содержит год
 - вторая строка содержит месяцы
@@ -22,7 +26,8 @@ from utils.logger import get_logger
 logger = get_logger(__name__)
 
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets.readonly']
-SHEET_NAME = os.environ.get('GOOGLE_SHEET_MARKETING_EXPENSES_NAME', 'Sheet1')
+CURRENT_YEAR = int(os.environ.get('GOOGLE_SHEET_MARKETING_EXPENSES_YEAR', datetime.now().year))
+SHEET_NAME = os.environ.get('GOOGLE_SHEET_MARKETING_EXPENSES_NAME', str(CURRENT_YEAR))
 
 _MONTH_NAME_MAP = {
     'січень': 1, 'лютий': 2, 'березень': 3, 'квітень': 4,
