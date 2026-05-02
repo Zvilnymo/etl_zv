@@ -33,6 +33,10 @@ B24_TOKEN_USERS = os.environ['B24_TOKEN_USERS']   # user.get
 # --- PostgreSQL ---
 DATABASE_URL = os.environ['DATABASE_URL']
 
+# --- Google Sheets ---
+GOOGLE_SHEET_MARKETING_EXPENSES_ID = os.environ['GOOGLE_SHEET_MARKETING_EXPENSES_ID']
+GOOGLE_SHEET_MARKETING_EXPENSES_NAME = os.environ.get('GOOGLE_SHEET_MARKETING_EXPENSES_NAME', 'Sheet1')
+
 # --- ETL settings ---
 INITIAL_LOAD_FROM       = date(2024, 1, 1)
 DEALS_CATEGORY_ID       = 0     # воронка продаж (category 0)

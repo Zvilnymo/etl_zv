@@ -28,6 +28,7 @@ from etl.tiktok import daily_stats_etl as tiktok_daily_stats_etl
 from etl.meta import daily_stats_etl as meta_daily_stats_etl
 from etl.gsheets import plans_etl as gsheets_plans_etl
 from etl.gsheets import dosudove_plans_etl as gsheets_dosudove_plans_etl
+from etl.gsheets import marketing_expenses_etl as gsheets_marketing_expenses_etl
 from utils.logger import get_logger
 from config import INITIAL_LOAD_FROM
 
@@ -116,6 +117,9 @@ def run_incremental():
 
     res = gsheets_dosudove_plans_etl.run()
     _log_run('gsheets_dosudove_plans', 'incremental', yesterday, today, res)
+
+    res = gsheets_marketing_expenses_etl.run()
+    _log_run('gsheets_marketing_expenses', 'incremental', yesterday, today, res)
 
     logger.info('=== INCREMENTAL DONE ===')
 
@@ -385,7 +389,26 @@ def run_gsheets():
     else:
         logger.info(f'GSheets dosudove plans: upserted {res["records_upserted"]}')
 
+    logger.info('=== GSHEETS MARKETING EXPENSES ===')
+    res = gsheets_marketing_expenses_etl.run()
+    _log_run('gsheets_marketing_expenses', 'gsheets', today, today, res)
+    if res['status'] == 'error':
+        logger.error(f'GSheets marketing expenses failed: {res["error"]}')
+    else:
+        logger.info(f'GSheets marketing expenses: upserted {res["records_upserted"]}')
+
     logger.info('=== GSHEETS DONE ===')
+
+
+def run_gsheets_expenses():
+    today = date.today()
+    logger.info('=== GSHEETS MARKETING EXPENSES ===')
+    res = gsheets_marketing_expenses_etl.run()
+    _log_run('gsheets_marketing_expenses', 'gsheets-expenses', today, today, res)
+    if res['status'] == 'error':
+        logger.error(f'GSheets marketing expenses failed: {res["error"]}')
+    else:
+        logger.info(f'GSheets marketing expenses: upserted {res["records_upserted"]}')
 
 
 def main():
@@ -401,6 +424,7 @@ def main():
             'meta-backfill',
             'bitrix-backfill',
             'gsheets',
+            'gsheets-expenses',
             'refresh-dims',
         ],
         default='incremental',
@@ -462,6 +486,8 @@ def main():
         run_meta_backfill(args.date_from, args.date_to)
     elif args.mode == 'gsheets':
         run_gsheets()
+    elif args.mode == 'gsheets-expenses':
+        run_gsheets_expenses()
     elif args.mode == 'refresh-dims':
         today = date.today()
         res = dimensions_etl.run()
