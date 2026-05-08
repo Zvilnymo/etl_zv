@@ -78,6 +78,7 @@ payments_by_month AS (
     FROM lead_month l
     JOIN crm.fact_deals d ON d.lead_id = l.lead_id
     JOIN crm.fact_invoices i ON i.deal_id = d.id
+    WHERE i.stage_id IN ('DT31_1:UC_WW75SB', 'DT31_1:P')
     GROUP BY 1,2,3
 )
 SELECT
