@@ -6,4 +6,6 @@ openpyxl==3.1.2
 python-dotenv==1.0.0   # опціонально, для локального запуску
 gspread==6.1.2
 google-auth==2.29.0
-google-ads==25.1.0
+google-ads
+grpcio>=1.59.0
+grpcio-status>=1.59.0
