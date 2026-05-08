@@ -29,6 +29,7 @@ from etl.meta import daily_stats_etl as meta_daily_stats_etl
 from etl.gsheets import plans_etl as gsheets_plans_etl
 from etl.gsheets import dosudove_plans_etl as gsheets_dosudove_plans_etl
 from etl.gsheets import marketing_expenses_etl as gsheets_marketing_expenses_etl
+from etl.google_ads import daily_stats_etl as google_ads_daily_stats_etl
 from utils.logger import get_logger
 from config import INITIAL_LOAD_FROM
 
@@ -120,6 +121,9 @@ def run_incremental():
 
     res = gsheets_marketing_expenses_etl.run()
     _log_run('gsheets_marketing_expenses', 'incremental', yesterday, today, res)
+
+    res = google_ads_daily_stats_etl.run(yesterday, today)
+    _log_run('google_ads_daily_stats', 'incremental', yesterday, today, res)
 
     logger.info('=== INCREMENTAL DONE ===')
 
@@ -358,6 +362,18 @@ def run_bitrix_backfill(date_from: date, date_to: date):
     logger.info('=== BITRIX BACKFILL DONE ===')
 
 
+def run_google_ads_backfill(date_from: date, date_to: date):
+    logger.info(f'=== GOOGLE ADS BACKFILL: {date_from} → {date_to} ===')
+    current = date_from
+    while current <= date_to:
+        batch_end = min(current + timedelta(days=29), date_to)
+        logger.info(f'Google Ads batch: {current} → {batch_end}')
+        res = google_ads_daily_stats_etl.run(current, batch_end)
+        _log_run('google_ads_daily_stats', 'google-ads-backfill', current, batch_end, res)
+        current = batch_end + timedelta(days=1)
+    logger.info('=== GOOGLE ADS BACKFILL DONE ===')
+
+
 def run_meta_backfill(date_from: date, date_to: date):
     logger.info(f'=== META BACKFILL: {date_from} → {date_to} ===')
     current = date_from
@@ -425,6 +441,7 @@ def main():
             'bitrix-backfill',
             'gsheets',
             'gsheets-expenses',
+            'google-ads-backfill',
             'refresh-dims',
         ],
         default='incremental',
@@ -488,6 +505,10 @@ def main():
         run_gsheets()
     elif args.mode == 'gsheets-expenses':
         run_gsheets_expenses()
+    elif args.mode == 'google-ads-backfill':
+        if not args.date_from or not args.date_to:
+            parser.error('--date-from and --date-to are required for google-ads-backfill mode')
+        run_google_ads_backfill(args.date_from, args.date_to)
     elif args.mode == 'refresh-dims':
         today = date.today()
         res = dimensions_etl.run()
