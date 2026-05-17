@@ -43,11 +43,11 @@ _MONTH_NAME_MAP = {
 
 _UPSERT_SQL = """
     INSERT INTO marketing.fact_marketing_expenses (
-        metric_name, year, month, amount, sheet_name, etl_loaded_at
+        metric_name, utm_source, year, month, amount, sheet_name, etl_loaded_at
     ) VALUES (
-        %(metric_name)s, %(year)s, %(month)s, %(amount)s, %(sheet_name)s, NOW()
+        %(metric_name)s, %(utm_source)s, %(year)s, %(month)s, %(amount)s, %(sheet_name)s, NOW()
     )
-    ON CONFLICT (metric_name, year, month) DO UPDATE SET
+    ON CONFLICT (metric_name, utm_source, year, month) DO UPDATE SET
         amount        = EXCLUDED.amount,
         sheet_name    = EXCLUDED.sheet_name,
         etl_loaded_at = NOW();
@@ -134,18 +134,35 @@ def _parse_records(rows) -> list[dict]:
     if not month_map:
         raise ValueError('No month columns detected in sheet')
 
+    # Detect optional UTM SOURCE column (e.g. "UTM SOURCE" in header row)
+    header_row = rows[month_row_idx]
+    utm_col_idx = next(
+        (i for i, c in enumerate(header_row) if 'utm' in str(c).strip().lower()),
+        None,
+    )
+
     records = []
+    last_metric_name = ''
     for row in rows[month_row_idx + 1:]:
         if not row:
             continue
-        metric_cell = row[0] if len(row) > 0 else None
-        if metric_cell is None:
-            continue
-        metric_name = str(metric_cell).strip()
+
+        metric_name = str(row[0]).strip() if len(row) > 0 else ''
+        # Carry forward metric name for merged-cell rows (Google Sheets returns '' for merged sub-rows)
+        if metric_name:
+            last_metric_name = metric_name
+        else:
+            metric_name = last_metric_name
+
         if not metric_name or 'метрика' in metric_name.lower() or 'місяць' in metric_name.lower():
             continue
         if _is_total_row(metric_name):
             continue
+
+        utm_source = ''
+        if utm_col_idx is not None and utm_col_idx < len(row):
+            raw = str(row[utm_col_idx]).strip()
+            utm_source = raw if raw and raw != '-' else ''
 
         for col_idx, month in month_map.items():
             if col_idx >= len(row):
@@ -155,6 +172,7 @@ def _parse_records(rows) -> list[dict]:
                 continue
             records.append({
                 'metric_name': metric_name,
+                'utm_source': utm_source,
                 'year': year,
                 'month': month,
                 'amount': amount,
