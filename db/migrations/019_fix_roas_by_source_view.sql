@@ -1,6 +1,4 @@
--- Migration 019: replace vw_roas_by_source with proper channel grouping
--- 4 paid channels: Google (utm_source='google'), Meta (utm_source='facebook-ads'),
--- TikTok (utm_source='ttads'), Viber (utm_source='viber-ads'). All others excluded.
+-- Migration 019: vw_roas_by_source — all lead sources, costs matched by utm_source
 
 CREATE OR REPLACE VIEW marketing.vw_roas_by_source AS
 WITH
@@ -9,14 +7,8 @@ lead_cohort AS (
     SELECT
         id AS lead_id,
         date_trunc('month', date_create)::date AS cohort_month,
-        CASE
-            WHEN utm_source = 'google'       THEN 'Google'
-            WHEN utm_source = 'facebook-ads' THEN 'Meta'
-            WHEN utm_source = 'ttads'        THEN 'TikTok'
-            WHEN utm_source = 'viber-ads'    THEN 'Viber'
-        END AS source
+        COALESCE(utm_source, 'Не вказано') AS source
     FROM crm.fact_leads
-    WHERE utm_source IN ('google', 'facebook-ads', 'ttads', 'viber-ads')
 ),
 
 leads_agg AS (
@@ -46,39 +38,41 @@ payments_agg AS (
     GROUP BY 1, 2
 ),
 
+-- Labels match lead utm_source values exactly so the LEFT JOIN works.
+-- Sheet has typo 'facebok-ads' → mapped to lead value 'facebook-ads'.
 costs_agg AS (
     SELECT date_trunc('month', stat_date)::date AS cohort_month,
-           'Google' AS source, SUM(cost_uah) AS amount
+           'google' AS source, SUM(cost_uah) AS amount
     FROM marketing.fact_google_ads_daily
     GROUP BY 1
     UNION ALL
-    SELECT make_date(year, month, 1), 'Google', SUM(amount)
+    SELECT make_date(year, month, 1), 'google', SUM(amount)
     FROM marketing.fact_marketing_expenses WHERE utm_source = 'google'
     GROUP BY 1
 
     UNION ALL
 
-    SELECT date_trunc('month', stat_date)::date, 'Meta', SUM(spend_uah)
+    SELECT date_trunc('month', stat_date)::date, 'facebook-ads', SUM(spend_uah)
     FROM marketing.fact_meta_daily
     GROUP BY 1
     UNION ALL
-    SELECT make_date(year, month, 1), 'Meta', SUM(amount)
+    SELECT make_date(year, month, 1), 'facebook-ads', SUM(amount)
     FROM marketing.fact_marketing_expenses WHERE utm_source = 'facebok-ads'
     GROUP BY 1
 
     UNION ALL
 
-    SELECT date_trunc('month', stat_date)::date, 'TikTok', SUM(spend)
+    SELECT date_trunc('month', stat_date)::date, 'ttads', SUM(spend)
     FROM marketing.fact_tiktok_daily
     GROUP BY 1
     UNION ALL
-    SELECT make_date(year, month, 1), 'TikTok', SUM(amount)
+    SELECT make_date(year, month, 1), 'ttads', SUM(amount)
     FROM marketing.fact_marketing_expenses WHERE utm_source = 'ttads'
     GROUP BY 1
 
     UNION ALL
 
-    SELECT make_date(year, month, 1), 'Viber', SUM(amount)
+    SELECT make_date(year, month, 1), 'viber-ads', SUM(amount)
     FROM marketing.fact_marketing_expenses WHERE utm_source = 'viber-ads'
     GROUP BY 1
 ),
