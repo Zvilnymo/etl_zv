@@ -1,6 +1,6 @@
 -- Migration 019: replace vw_roas_by_source with proper channel grouping
--- utm_source from crm.fact_leads is normalized into 5 canonical channels.
--- Costs are attributed per channel → true channel ROAS.
+-- Only 3 paid channels: Google (utm_source='google'), Meta (utm_source='facebook-ads'),
+-- TikTok (utm_source='ttads'). All other lead sources are excluded.
 
 CREATE OR REPLACE VIEW marketing.vw_roas_by_source AS
 WITH
@@ -10,14 +10,12 @@ lead_cohort AS (
         id AS lead_id,
         date_trunc('month', date_create)::date AS cohort_month,
         CASE
-            WHEN utm_source IN ('facebook-ads', 'facebook', 'fb', 'instagram-smm',
-                                'facebook-smm', 'facebook_ads_organic', 'ig') THEN 'Meta'
-            WHEN utm_source = 'google'                                          THEN 'Google'
-            WHEN utm_source IN ('tiktok', 'ttads', 'tiktok-ads', 'vtads')      THEN 'TikTok'
-            WHEN utm_source = 'viber-ads'                                       THEN 'Viber'
-            ELSE 'Інше'
+            WHEN utm_source = 'google'       THEN 'Google'
+            WHEN utm_source = 'facebook-ads' THEN 'Meta'
+            WHEN utm_source = 'ttads'        THEN 'TikTok'
         END AS source
     FROM crm.fact_leads
+    WHERE utm_source IN ('google', 'facebook-ads', 'ttads')
 ),
 
 leads_agg AS (
@@ -75,18 +73,6 @@ costs_agg AS (
     UNION ALL
     SELECT make_date(year, month, 1), 'TikTok', SUM(amount)
     FROM marketing.fact_marketing_expenses WHERE utm_source = 'ttads'
-    GROUP BY 1
-
-    UNION ALL
-
-    SELECT make_date(year, month, 1), 'Viber', SUM(amount)
-    FROM marketing.fact_marketing_expenses WHERE utm_source = 'viber-ads'
-    GROUP BY 1
-
-    UNION ALL
-    -- Unattributed overhead (salaries, video, PR)
-    SELECT make_date(year, month, 1), 'Інше', SUM(amount)
-    FROM marketing.fact_marketing_expenses WHERE utm_source = ''
     GROUP BY 1
 ),
 
