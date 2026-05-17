@@ -1,6 +1,6 @@
 -- Migration 019: replace vw_roas_by_source with proper channel grouping
--- Only 3 paid channels: Google (utm_source='google'), Meta (utm_source='facebook-ads'),
--- TikTok (utm_source='ttads'). All other lead sources are excluded.
+-- 4 paid channels: Google (utm_source='google'), Meta (utm_source='facebook-ads'),
+-- TikTok (utm_source='ttads'), Viber (utm_source='viber-ads'). All others excluded.
 
 CREATE OR REPLACE VIEW marketing.vw_roas_by_source AS
 WITH
@@ -13,9 +13,10 @@ lead_cohort AS (
             WHEN utm_source = 'google'       THEN 'Google'
             WHEN utm_source = 'facebook-ads' THEN 'Meta'
             WHEN utm_source = 'ttads'        THEN 'TikTok'
+            WHEN utm_source = 'viber-ads'    THEN 'Viber'
         END AS source
     FROM crm.fact_leads
-    WHERE utm_source IN ('google', 'facebook-ads', 'ttads')
+    WHERE utm_source IN ('google', 'facebook-ads', 'ttads', 'viber-ads')
 ),
 
 leads_agg AS (
@@ -73,6 +74,12 @@ costs_agg AS (
     UNION ALL
     SELECT make_date(year, month, 1), 'TikTok', SUM(amount)
     FROM marketing.fact_marketing_expenses WHERE utm_source = 'ttads'
+    GROUP BY 1
+
+    UNION ALL
+
+    SELECT make_date(year, month, 1), 'Viber', SUM(amount)
+    FROM marketing.fact_marketing_expenses WHERE utm_source = 'viber-ads'
     GROUP BY 1
 ),
 
