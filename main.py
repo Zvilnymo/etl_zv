@@ -16,6 +16,7 @@
   python main.py --mode gsheets                                                              # тільки Google Sheets → manager_plans_weekly
 """
 import argparse
+import time
 from datetime import date, timedelta
 
 from dateutil.relativedelta import relativedelta
@@ -79,6 +80,33 @@ def _run_batch(date_from: date, date_to: date, mode: str):
     _log_run('stage_history', mode, date_from, date_to, res)
 
 
+def run_sales_motivation_refresh() -> dict:
+    """Перераховує crm.sales_motivation_monthly (поточний + попередній місяць) — матеріалізована
+    таблиця для дашборду мотивації менеджерів у Looker Studio, замінює важку vw_sales_motivation_monthly.
+    Викликати ОСТАННІМ кроком інкременту, після того як за день вже лягли свіжі leads/invoices/deals."""
+    started = time.monotonic()
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute('SELECT crm.refresh_sales_motivation_monthly();')
+        conn.commit()
+        return {
+            'status': 'success',
+            'records_processed': 0,
+            'records_upserted': 0,
+            'duration_sec': round(time.monotonic() - started, 2),
+        }
+    except Exception as e:
+        conn.rollback()
+        return {
+            'status': 'error',
+            'error': str(e),
+            'duration_sec': round(time.monotonic() - started, 2),
+        }
+    finally:
+        release_conn(conn)
+
+
 def run_incremental():
     today     = date.today()
     yesterday = today - timedelta(days=1)
@@ -124,6 +152,13 @@ def run_incremental():
 
     res = google_ads_daily_stats_etl.run(yesterday, today)
     _log_run('google_ads_daily_stats', 'incremental', yesterday, today, res)
+
+    res = run_sales_motivation_refresh()
+    _log_run('sales_motivation_refresh', 'incremental', yesterday, today, res)
+    if res['status'] == 'error':
+        logger.error(f'Sales motivation refresh failed: {res["error"]}')
+    else:
+        logger.info(f'Sales motivation refreshed in {res["duration_sec"]}s')
 
     logger.info('=== INCREMENTAL DONE ===')
 
