@@ -312,6 +312,19 @@ TOPICS = {
         '26. Системні поля CRM',
         'технічне поле Bitrix24 (ідентифікатори, дати, відповідальні) — юридичного значення не має',
         '—', [], '—', R_SYSTEM),
+    'company_card': (
+        '27. Картка компанії (контрагента)',
+        'реєстрові та фінансові дані юридичної особи в картці «Компанія» (ЄДР, КВЕД, звітність, скоринг) — '
+        'для справи боржника-фізособи не використовуються; значення мають лише назва та ЄДРПОУ, якщо компанія '
+        'є кредитором (тоді беруться з картки кредитора)',
+        'ЄДР, фінансова звітність (дані сервісів-агрегаторів)',
+        [], '—', R_SERVICE),
+    'directory': (
+        '28. Довідники органів',
+        'реквізити державних органів (адреса, e-mail, сайт) — адресати запитів юриста / арбітражного керуючого '
+        'щодо майна та доходів боржника; самі не доказ, потрібні для складання та надсилання запитів',
+        'Офіційні сайти органів, ЄДР',
+        [D_PROC], 'ст. 113, 128 КУзПБ (повноваження АК щодо запитів)', R_REQUISITES),
 }
 
 # Правила по назві (lower-case). Перше співпадіння виграє — специфічні вище загальних.
@@ -374,6 +387,20 @@ TOPIC_RULES = [
      r'цифровий підпис', 'id'),
     (r'прописка|адреса|місто|країн|область|район|поштовий індекс|місцезнаходження|проживання', 'address'),
     (r'телефон|e-mail|відкрита лінія|електрона пошта', 'contacts'),
+    # поля контактів / смарт-процесів (вивантаження --from-b24)
+    (r'скорость реакции|попередн(я|ій|ю|ьої) стаді|попередній стаждіх|зміна стадії|^google (gclid|gbraid|wbraid)$|'
+     r'crm-форма|^id агента$|chatbot_user_id', 'sales'),
+    (r'статус оплат|гарантійн|список платежів|перший платіж', 'service_contract'),
+    (r'нової пошти', 'logistics'),
+    (r'^ак\.|відповідальний ак', 'ak'),
+    (r'заблокован(а|ої) картк|банківської картки|банківської таємниці', 'accounts'),
+    (r'посвідчення пв|перелік отриманих постанов|скарга|клопотання|цив\. позов|лист на роботу|загальні суди', 'exec'),
+    (r'листи-вимоги|кредитодавц|згода надання даних|є фактором|factor_chain|проданий', 'creditor'),
+    (r'кредит|договір|процентна ставка|штраф|пеня|ануїтет|нарахован|проплати|проценти|виплачена сума|'
+     r'буде списано|сума виплати по договору|договорів', 'credit_contract'),
+    (r'єдрпоу|форма власності|назва організації|керівник', 'creditor'),
+    (r'^індекс$', 'address'),
+    (r'печатка|підпис', 'template'),
 ]
 _COMPILED = [(re.compile(p, re.IGNORECASE), t) for p, t in TOPIC_RULES]
 
@@ -393,9 +420,35 @@ SYSTEM_CODES = {
     'UF_CRM_IS_REPEATED_APPROACH', 'UF_CRM_LEAD_ID', 'UF_CRM_OPPORTUNITY_ACCOUNT', 'UF_CRM_ORDER_IDS',
     'UF_CRM_ORIGINATOR_ID', 'UF_CRM_ORIGIN_ID', 'UF_CRM_PROBABILITY', 'UF_CRM_PRODUCT_IDS',
     'UF_CRM_STAGE_ID', 'UF_CRM_TYPE_ID', 'UF_CRM_1752795359931',
+    # контакт / компанія / смарт-процеси
+    'PHOTO', 'EXPORT', 'COMPANY_IDS', 'ORIGIN_VERSION', 'WEB', 'IM', 'LINK', 'XML_ID', 'CREATED_TIME',
+    'UPDATED_TIME', 'CREATED_BY', 'UPDATED_BY', 'MOVED_BY', 'PREVIOUS_STAGE_ID', 'WEBFORM_ID', 'MYCOMPANY_ID',
+    'LAST_COMMUNICATION_CALL_TIME', 'LAST_COMMUNICATION_EMAIL_TIME', 'LAST_COMMUNICATION_IMOL_TIME',
+    'LAST_COMMUNICATION_WEBFORM_TIME', 'CONTACT_IDS', 'CONTACTS', 'PARENT_ID_2', 'PARENT_ID_1050', 'PARENT_ID_1068',
+    'COMPANY_TYPE', 'LOGO', 'INDUSTRY', 'EMPLOYEES', 'REVENUE', 'IS_MY_COMPANY', 'BANKING_DETAILS',
+    'UF_CRM_1713350553874', 'UF_CRM_6A13E5618771D', 'UF_CRM_6AB282134A033', 'UF_CRM_6AB282179604C',
 }
 # Службові поля інтернет-магазину / конструктора Bitrix24 (UF_CRM_664F2...) — копії системних
 SYSTEM_PREFIXES = ('UF_CRM_664F2',)
+
+# Якщо назва нічого не дала — тема за смарт-процесом (UF_CRM_<id>_...) або групою полів
+CODE_PREFIX_TOPICS = [
+    ('UF_CRM_1695393', 'company_card'),     # Компанія: дані з ЄДР / звітності
+    ('UF_CRM_2_', 'court_fee'),             # СП «Суди»: реквізити для сплати судового збору
+    ('UF_CRM_4_', 'creditor'),              # СП «Кредитори» (довідник)
+    ('UF_CRM_5_', 'credit_contract'),       # СП «Список кредиторів клієнта»
+    ('UF_CRM_6_', 'service_contract'),      # СП «Договори»
+    ('UF_CRM_11_', 'service_contract'),     # СП «Гарантійні листи»
+    ('UF_CRM_12_', 'system'),               # СП «Тестовий смарт-процес»
+    ('UF_CRM_13_', 'court_case'),           # СП «Судові справи»
+    ('UF_CRM_14_', 'court_case'),           # СП «Засідання»
+    ('UF_CRM_15_', 'exec'),                 # СП «Виконавчі провадження»
+    ('UF_CRM_16_', 'directory'),            # СП «Управління ДПС»
+    ('UF_CRM_17_', 'court_case'),           # СП «Процесуальні документи»
+    ('UF_CRM_18_', 'court_case'),           # СП «Судові рішення»
+    ('UF_CRM_20_', 'directory'),            # СП «РСЦ ГСЦ МВС»
+    ('UF_CRM_21_', 'directory'),            # СП «Державний орган для запиту АК»
+]
 
 # Скринінгові питання (лід / угода продажу): відповіді клієнта, не доказ
 SCREENING_CODES = {
@@ -573,7 +626,86 @@ OVERRIDES = {
                                                   'для порівняння з фактичною (підстава оскарження)'),
     'UF_CRM_1660399462': dict(topic='exec', sense='хибна адреса проживання у виконавчому написі / ВП — '
                                                   'аргумент для оскарження виконавчого напису'),
+    # --- Контакт ---
+    'UF_CRM_1659985573': dict(topic='history', role=R_SERVICE, docs=[],
+                              sense='посилання на Google-диск з документами клієнта (сховище, не доказ)'),
+    'UF_CRM_1786651545356': dict(topic='history', role=R_SERVICE, docs=[],
+                                 sense='посилання на Google-диск з документами клієнта (сховище, не доказ)'),
+    'UF_CRM_1685781762': dict(topic='system', sense='відповідальний юрист компанії по клієнту'),
+    'UF_CRM_1660160552': dict(topic='ak', role=R_SERVICE, docs=[],
+                              sense='арбітражний керуючий, закріплений за клієнтом (посилання на картку АК)'),
+    'UF_CRM_1787309819576': dict(topic='contacts', role=R_SERVICE, docs=[],
+                                 sense='надавач КЕП клієнта — для входу в Електронний суд / Дію (сам ключ і пароль у CRM не зберігати)'),
+    'UF_CRM_69A92F3C6E7AF': dict(topic='sales', sense='коментар менеджера при зміні стадії'),
+    'UF_CRM_1761529400843': dict(topic='template', role=R_TEMPLATE, sense='зображення печатки для автогенерації документів (ймовірно, АК / компанії)'),
+    'UF_CRM_1762131556968': dict(topic='template', role=R_TEMPLATE, sense='зображення підпису для автогенерації документів (ймовірно, АК / компанії)'),
+    # --- Список кредиторів клієнта (СП) ---
+    'UF_CRM_5_1664191708023': dict(topic='creditor', sense='назва кредитора — рядок переліку кредиторів у заяві'),
+    'UF_CRM_5_1664191738366': dict(topic='creditor', sense='код ЄДРПОУ кредитора — ідентифікує кредитора в переліку'),
+    'UF_CRM_5_1664193821': dict(topic='credit_contract', sense='номер кредитного договору — підстава вимоги кредитора'),
+    'UF_CRM_5_1664193808': dict(topic='credit_contract', sense='дата укладення кредитного договору'),
+    'UF_CRM_5_1664194148': dict(topic='credit_contract', sense='тіло кредиту (сума за договором) — основний борг'),
+    'UF_CRM_5_CONTRACTLIST': dict(topic='credit_contract', sense='перелік договорів з цим кредитором (номер, дата) для переліку кредиторів'),
+    'UF_CRM_5_1769512949415': dict(topic='credit_contract', role=R_CALC,
+                                   sense='сума боргу перед кредитором, що буде списана згідно з планом реструктуризації'),
+    'UF_CRM_5_1760342885': dict(topic='credit_contract', role=R_CALC,
+                                sense='щомісячна виплата цьому кредитору згідно з планом реструктуризації'),
+    'UF_CRM_5_1779128245': dict(topic='creditor', sense='вимогу продано (відступлено) іншому кредитору / колектору — '
+                                                        'у переліку кредиторів вказується новий кредитор'),
+    'UF_CRM_5_FACTOR_CHAIN': dict(topic='creditor', sense='ланцюг відступлення права вимоги (первісний кредитор → фактор → …)'),
+    'UF_CRM_5_1664192840': dict(topic='creditor', sense='кредитор є фактором (новим кредитором) за договором відступлення'),
+    'UF_CRM_5_1780667226': dict(topic='creditor', role=R_SYSTEM, docs=[],
+                                sense='ЄДРПОУ, автоматично розпізнаний з документа (неточний) — звіряти з ЄДР'),
+    'UF_CRM_5_1780754310': dict(topic='system', sense='назва файлу, з якого автоматично заповнено запис кредитора'),
+    'UF_CRM_5_1780754350': dict(topic='system', sense='посилання на файл, з якого автоматично заповнено запис кредитора'),
+    'UF_CRM_5_1713147457886': dict(topic='creditor', role=R_EVIDENCE,
+                                   sense='згода клієнта на надання даних кредитором (додаток до запиту кредитору)'),
+    'UF_CRM_5_1727336939': dict(topic='accounts', role=R_EVIDENCE,
+                                sense='дозвіл клієнта на розкриття банківської таємниці (для отримання виписок / відомостей від банку)'),
+    'UF_CRM_5_1664195392': dict(topic='creditor', role=R_SCREEN, docs=[],
+                                sense='оцінка становища боржника для оскарження дій кредитора (архів)'),
+    'UF_CRM_5_1664196075': dict(topic='creditor', role=R_SERVICE, docs=[], sense='сайт кредитодавця'),
+    'UF_CRM_5_1664194381': dict(topic='system', sense='посилання на угоду клієнта (архів)'),
+    'UF_CRM_5_1664196581': dict(topic='system', sense='технічний статус завантаження листів-вимог (архів)'),
+    'UF_CRM_4_1663672349': dict(topic='creditor', role=R_REQUISITES,
+                                sense='стан кредитора за ЄДР (зареєстровано / припинено) — чи існує кредитор на дату подання'),
+    'UF_CRM_2_1660156916': dict(topic='court_fee', sense='код ЄДРПОУ отримувача судового збору'),
+    'UF_CRM_12_1756127665984': dict(topic='system', sense='тестове поле'),
+    # --- Гарантійні листи (СП) ---
+    'UF_CRM_11_1750708749': dict(topic='service_contract', role=R_EVIDENCE, docs=[],
+                                 sense='скан гарантійного листа',
+                                 note='Зміст СП «Гарантійні листи» уточнити: якщо це листи кредиторів — перенести в блок «Кредитори»'),
+    'UF_CRM_11_1753374261': dict(topic='service_contract', sense='тіло кредиту, до якого видано гарантійний лист',
+                                 note='Зміст СП «Гарантійні листи» уточнити'),
+    'UF_CRM_11_1753374328': dict(topic='service_contract', sense='сума гарантійного листа',
+                                 note='Зміст СП «Гарантійні листи» уточнити'),
+    # --- Суди / засідання / рішення (СП) ---
+    'UF_CRM_2_1660156783': dict(topic='directory', sense='e-mail суду — для надсилання документів'),
+    'UF_CRM_13_CASE_ID': dict(topic='court_case', sense='номер / ID судової справи'),
+    'UF_CRM_13_CASE_DATE': dict(topic='court_case', sense='дата відкриття провадження у справі'),
+    'UF_CRM_13_CASE_COURT': dict(topic='court_case', sense='суд, у якому розглядається справа'),
+    'UF_CRM_13_CASE_PARTICIPANTS': dict(topic='court_case', sense='учасники справи (боржник, кредитори, АК)'),
+    'UF_CRM_14_DATE': dict(topic='court_case', sense='дата й час судового засідання — контроль явки та строків'),
+    'UF_CRM_14_PRESIDENTJUDGEID': dict(topic='court_case', sense='ID головуючого судді (з ЄДРСР / «Судова влада»)'),
+    'UF_CRM_14_SPEAKERJUDGEID': dict(topic='court_case', sense='ID судді-доповідача (з ЄДРСР / «Судова влада»)'),
+    'UF_CRM_17_DOC_TYPE': dict(topic='court_case', role=R_PROCESS, docs=[D_PROC],
+                               sense='тип процесуального документа (заява, ухвала, клопотання…)'),
+    'UF_CRM_17_MAIN_DOC': dict(topic='court_case', role=R_EVIDENCE, docs=[D_PROC],
+                               sense='файл процесуального документа (поданий / отриманий у справі)'),
+    'UF_CRM_18_MAIN_FILE': dict(topic='court_case', role=R_EVIDENCE, docs=[D_PROC],
+                                sense='текст судового рішення (ухвала / постанова) — підтверджує процесуальний стан справи'),
+    'UF_CRM_18_DATE': dict(topic='court_case', sense='дата судового рішення — від неї рахуються строки оскарження'),
+    # --- Виконавчі провадження (СП) ---
+    'UF_CRM_15_1784032893403': dict(topic='exec', role=R_SERVICE, docs=[], sense='тип задачі юриста по виконавчому провадженню'),
+    'UF_CRM_15_1790097052869': dict(topic='exec', role=R_SERVICE, docs=[], sense='тип задачі юриста по виконавчому провадженню'),
 }
+# Згенеровані документи для оскарження дій кредитора / виконавця (СП «Список кредиторів клієнта», архів)
+for _code in ('UF_CRM_5_1664196126', 'UF_CRM_5_1664196141', 'UF_CRM_5_1664196153', 'UF_CRM_5_1664196165',
+              'UF_CRM_5_1664196176', 'UF_CRM_5_1664196337', 'UF_CRM_5_1664196367', 'UF_CRM_5_1664196427',
+              'UF_CRM_5_1664196441', 'UF_CRM_5_1664196448', 'UF_CRM_5_1664196460', 'UF_CRM_5_1664196468'):
+    OVERRIDES[_code] = dict(topic='exec', role=R_TEMPLATE, docs=[],
+                            sense='згенерований документ для оскарження дій кредитора / виконавця (архів)')
+
 _CREDITOR_SLOT = re.compile(r'кредитор\s+(\d+)\s*\(для кск\)', re.IGNORECASE)
 
 
@@ -618,6 +750,8 @@ def classify(code: str, name: str, ftype: str) -> dict:
             if rx.search(name):
                 topic = t
                 break
+    if not topic:
+        topic = next((t for prefix, t in CODE_PREFIX_TOPICS if code.startswith(prefix)), None)
 
     if not topic:
         return dict(block='99. Не класифіковано', what=clean_name(name), sense='', evidence='', docs=[], norm='', role=R_UNKNOWN,

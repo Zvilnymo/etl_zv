@@ -159,7 +159,8 @@ def build_rows(fields: list) -> list:
         if twins:
             recs.append('Дубль назви: ' + ', '.join(twins[:5]) + (' …' if len(twins) > 5 else ''))
         low = (f['name'] or '').lower()
-        if 'на видалення' in low or low.startswith('старе'):
+        if ('на видалення' in low or low.startswith(('старе', '[архів', 'видалити', 'тест'))
+                or low in ('нове поле', 'новий список')):
             recs.append('Позначене як застаріле')
 
         rows.append(dict(
