@@ -5,12 +5,14 @@
 Джерела полів:
   --audit-xlsx PATH   вивантаження аудиту полів (bitrix_field_audit.xlsx: аркуші Ліди / Продажа /
                       Початок шлях до суду / Суд, колонки «Назва поля», «Код поля», «Тип», «% заповнення»)
-  --from-b24          живе вивантаження з Bitrix24: crm.lead/deal/contact/company.fields + всі смарт-процеси
-                      (потрібні B24_DOMAIN, B24_USER_ID і B24_TOKEN_FIELDS або B24_TOKEN_DEALS)
+  --from-b24          живе вивантаження з Bitrix24: поля + % заповнення по всіх записах
+                      (--entities lead,deal,contact,company,sp; потрібні B24_DOMAIN, B24_USER_ID
+                      і B24_TOKEN_FIELDS або B24_TOKEN_DEALS)
 
 Приклади:
   python -m tools.crm_fields.build_catalog --audit-xlsx bitrix_field_audit.xlsx
-  python -m tools.crm_fields.build_catalog --from-b24 --out docs/crm_fields/crm_fields_legal_map.xlsx
+  python -m tools.crm_fields.build_catalog --from-b24 --entities contact,sp --since 2025-06-01 \
+      --out docs/crm_fields/crm_fields_contacts_sp.xlsx
 """
 import argparse
 import os
@@ -61,29 +63,69 @@ def load_from_audit(path: str) -> list:
     return list(fields.values())
 
 
-def load_from_b24() -> list:
-    """Поля з Bitrix24 REST (без % заповнення)."""
+def _is_filled(value) -> bool:
+    if value is None or value is False:
+        return False
+    if isinstance(value, str):
+        return value.strip() not in ('', '0', 'N', '|UAH', '0|UAH')
+    if isinstance(value, (list, dict)):
+        return any(_is_filled(v) for v in (value.values() if isinstance(value, dict) else value))
+    if isinstance(value, (int, float)):
+        return value != 0
+    return True
+
+
+def _fill_rates(items: list, keys: list) -> dict:
+    """% заповнення по кожному ключу (None, якщо записів немає)."""
+    if not items:
+        return {k: None for k in keys}
+    return {k: round(100.0 * sum(1 for it in items if _is_filled(it.get(k))) / len(items), 1) for k in keys}
+
+
+def load_from_b24(entities: set, since: str = None, with_fill: bool = True) -> list:
+    """Поля з Bitrix24 REST; з with_fill — ще й % заповнення по всіх записах сутності.
+
+    entities: підмножина {'lead', 'deal', 'contact', 'company', 'sp'}.
+    since:    'YYYY-MM-DD' — рахувати заповненість лише по записах, змінених після дати.
+    """
     from etl.bitrix.b24 import B24
     token = os.environ.get('B24_TOKEN_FIELDS') or os.environ['B24_TOKEN_DEALS']
     b24 = B24(os.environ['B24_DOMAIN'], int(os.environ['B24_USER_ID']), token)
 
     fields = OrderedDict()
 
-    def add(entity, code, meta):
+    def add(entity, code, meta, pct=None):
         name = meta.get('listLabel') or meta.get('formLabel') or meta.get('title') or code
         f = fields.setdefault(code, dict(code=code, name=name, type=meta.get('type', ''), entities=OrderedDict()))
-        f['entities'][entity] = None
+        f['entities'][entity] = pct
 
-    for method, label in [('crm.lead.fields', 'Лід'), ('crm.deal.fields', 'Угода'),
-                          ('crm.contact.fields', 'Контакт'), ('crm.company.fields', 'Компанія')]:
-        for code, meta in b24.call(method).items():
-            add(label, code, meta)
+    classic = [('lead', 'crm.lead', 'Лід'), ('deal', 'crm.deal', 'Угода'),
+               ('contact', 'crm.contact', 'Контакт'), ('company', 'crm.company', 'Компанія')]
+    for key, prefix, label in classic:
+        if key not in entities:
+            continue
+        meta_all = b24.call(f'{prefix}.fields')
+        rates = {}
+        if with_fill:
+            flt = {'>=DATE_MODIFY': f'{since}T00:00:00'} if since else {}
+            items = b24.get_list(f'{prefix}.list', b24_filter=flt, select=['*', 'UF_*', 'PHONE', 'EMAIL'])
+            rates = _fill_rates(items, list(meta_all))
+            label = f'{label} ({len(items)} зап.)'
+        for code, meta in meta_all.items():
+            add(label, code, meta, rates.get(code))
 
-    types = b24.call('crm.type.list').get('types', [])
-    for t in types:
-        res = b24.call('crm.item.fields', {'entityTypeId': t['entityTypeId']})
-        for code, meta in res.get('fields', {}).items():
-            add(f'СП: {t["title"]}', meta.get('upperName') or code, meta)
+    if 'sp' in entities:
+        for t in b24.call('crm.type.list').get('types', []):
+            etid = t['entityTypeId']
+            meta_all = b24.call('crm.item.fields', {'entityTypeId': etid}).get('fields', {})
+            rates, label = {}, f'СП: {t["title"]}'
+            if with_fill:
+                flt = {'>=updatedTime': f'{since}T00:00:00'} if since else {}
+                items = b24.get_list('crm.item.list', b24_filter=flt, select=['*'], entity_type_id=etid)
+                rates = _fill_rates(items, list(meta_all))
+                label = f'{label} ({len(items)} зап.)'
+            for code, meta in meta_all.items():
+                add(label, meta.get('upperName') or code, meta, rates.get(code))
     return list(fields.values())
 
 
@@ -241,12 +283,17 @@ def main():
     src = ap.add_mutually_exclusive_group(required=True)
     src.add_argument('--audit-xlsx')
     src.add_argument('--from-b24', action='store_true')
+    ap.add_argument('--entities', default='contact,company,sp',
+                    help='для --from-b24: lead,deal,contact,company,sp (за замовчуванням — контакти, компанії, смарт-процеси)')
+    ap.add_argument('--since', help='для --from-b24: рахувати заповненість лише по записах, змінених з дати YYYY-MM-DD')
+    ap.add_argument('--no-fill', action='store_true', help='для --from-b24: лише список полів, без % заповнення')
     ap.add_argument('--out', default='docs/crm_fields/crm_fields_legal_map.xlsx')
     args = ap.parse_args()
 
     if args.from_b24:
-        fields = load_from_b24()
-        note = 'Джерело: Bitrix24 REST (crm.*.fields + смарт-процеси)'
+        entities = {e.strip() for e in args.entities.split(',') if e.strip()}
+        fields = load_from_b24(entities, since=args.since, with_fill=not args.no_fill)
+        note = f'Джерело: Bitrix24 REST ({", ".join(sorted(entities))})' + (f', записи з {args.since}' if args.since else '')
     else:
         fields = load_from_audit(args.audit_xlsx)
         note = 'Джерело: bitrix_field_audit (Ліди / Продаж / Підготовка до суду / Суд, період 2025-06-01 → 2026-02-27)'
