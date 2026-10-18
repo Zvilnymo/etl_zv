@@ -15,6 +15,7 @@
       --out docs/crm_fields/crm_fields_contacts_sp.xlsx
 """
 import argparse
+import re
 import os
 from collections import OrderedDict, defaultdict
 
@@ -90,7 +91,12 @@ def load_from_b24(entities: set, since: str = None, with_fill: bool = True) -> l
     """
     from etl.bitrix.b24 import B24
     token = os.environ.get('B24_TOKEN_FIELDS') or os.environ['B24_TOKEN_DEALS']
-    b24 = B24(os.environ['B24_DOMAIN'], int(os.environ['B24_USER_ID']), token)
+    domain, user_id = os.environ['B24_DOMAIN'], int(os.environ['B24_USER_ID'])
+    # у змінну іноді кладуть повний URL вебхука: https://<домен>/rest/<user>/<токен>/
+    m = re.match(r'https?://([^/]+)/rest/(\d+)/([^/]+)', token.strip())
+    if m:
+        domain, user_id, token = m.group(1), int(m.group(2)), m.group(3)
+    b24 = B24(domain, user_id, token)
 
     fields = OrderedDict()
 
