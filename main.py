@@ -14,6 +14,8 @@
   python main.py --mode ringostat-incremental                                                # ежедневный инкремент звонков
   python main.py --mode ringostat-backfill --date-from 2025-01-01 --date-to 2025-12-31     # звонки за произвольный период
   python main.py --mode gsheets                                                              # тільки Google Sheets → manager_plans_weekly
+  python main.py --mode doc-registry                                                         # Google Диск (Клієнти) → реєстр документів docs.fact_documents
+  python main.py --mode doc-registry-incremental                                             # реєстр документів: лише змінені файли
 """
 import argparse
 import time
@@ -31,6 +33,7 @@ from etl.gsheets import plans_etl as gsheets_plans_etl
 from etl.gsheets import dosudove_plans_etl as gsheets_dosudove_plans_etl
 from etl.gsheets import marketing_expenses_etl as gsheets_marketing_expenses_etl
 from etl.google_ads import daily_stats_etl as google_ads_daily_stats_etl
+from etl.gdrive import doc_registry_etl
 from utils.logger import get_logger
 from config import INITIAL_LOAD_FROM
 
@@ -462,6 +465,17 @@ def run_gsheets_expenses():
         logger.info(f'GSheets marketing expenses: upserted {res["records_upserted"]}')
 
 
+def run_doc_registry(mode: str):
+    today = date.today()
+    logger.info(f'=== DOC REGISTRY ({mode}) ===')
+    res = doc_registry_etl.run(mode)
+    _log_run('gdrive_doc_registry', f'doc-registry-{mode}', today, today, res)
+    if res['status'] == 'error':
+        logger.error(f'Doc registry failed: {res["error"]}')
+    else:
+        logger.info(f'Doc registry: processed {res["records_processed"]} files ({res["status"]})')
+
+
 def main():
     parser = argparse.ArgumentParser(description='Bitrix24 → PostgreSQL ETL')
     parser.add_argument(
@@ -478,6 +492,8 @@ def main():
             'gsheets-expenses',
             'google-ads-backfill',
             'refresh-dims',
+            'doc-registry',
+            'doc-registry-incremental',
         ],
         default='incremental',
         help='initial | incremental | backfill | ... | gsheets',
@@ -549,6 +565,10 @@ def main():
         res = dimensions_etl.run()
         _log_run('dimensions', 'refresh-dims', today, today, res)
         logger.info(f'Dimensions refreshed: {res.get("counts")}')
+    elif args.mode == 'doc-registry':
+        run_doc_registry('full')
+    elif args.mode == 'doc-registry-incremental':
+        run_doc_registry('incremental')
     else:
         run_incremental()
 
