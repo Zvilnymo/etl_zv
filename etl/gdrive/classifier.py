@@ -24,6 +24,7 @@ _INVISIBLE_RE = re.compile('[⁦-⁩​-‏﻿]')
 _ARCHIVE_EXT = ('.zip', '.rar', '.7z', '.tar', '.gz')
 # Контейнери підпису: «Заява.docx.p7s» класифікуємо за внутрішньою назвою
 _SIGNED_EXT = ('.p7s', '.asice', '.asics', '.sig')
+_SERVICE_CODES = ('00.02', '00.05')
 
 
 def normalize(text: str) -> str:
@@ -32,12 +33,18 @@ def normalize(text: str) -> str:
     return _SPACE_RE.sub(' ', text).strip()
 
 
-def _strip_signed(name: str):
-    low = name.lower().rstrip()
-    for ext in _SIGNED_EXT:
-        if low.endswith(ext):
-            return name.rstrip()[:-len(ext)], True
-    return name, False
+def _strip_containers(name: str):
+    """«Заява.pdf.p7s.asice.zip» → («Заява.pdf», signed=True, archive=True)"""
+    name = name.rstrip()
+    signed = archive = False
+    while True:
+        low = name.lower()
+        ext = next((e for e in _SIGNED_EXT + _ARCHIVE_EXT if low.endswith(e)), None)
+        if ext is None:
+            return name, signed, archive
+        signed |= ext in _SIGNED_EXT
+        archive |= ext in _ARCHIVE_EXT
+        name = name[:-len(ext)].rstrip()
 
 
 def _strip_ext(name: str) -> str:
@@ -118,7 +125,7 @@ def classify(name: str, mime: str = '', folders: tuple = ()) -> dict:
     (кореневі «Клієнти» / «Клієнти_клон» передавати не треба).
     """
     folders = tuple(folders or ())
-    name, signed = _strip_signed(name or '')
+    name, signed, archive = _strip_containers(name or '')
     raw = name.lower()
     text = normalize(_strip_ext(name))
     folder_texts = [normalize(f) for f in folders]
@@ -128,6 +135,7 @@ def classify(name: str, mime: str = '', folders: tuple = ()) -> dict:
              for k, rxs in status_rx.items()}
     flags['is_copy'] = any(rx.search(text) for rx in status_rx['is_copy'])
     flags['signed_container'] = signed
+    flags['is_zip'] = archive and not signed
     subject = 'relative' if any(rx.search(t) for rx in relative_rx for t in [text] + folder_texts[:1]) else 'debtor'
     creditor = detect_creditor(text) or next((c for c in map(detect_creditor, folder_texts[:2]) if c), None)
     extra = dict(flags=flags, subject=subject, creditor=creditor)
@@ -148,6 +156,11 @@ def classify(name: str, mime: str = '', folders: tuple = ()) -> dict:
 
     group_blocks = next((blocks for t in folder_texts[:-1] or folder_texts
                          for rx, blocks in group_rx if rx.search(t)), None)
+
+    if name_hits and name_hits[0][1] in _SERVICE_CODES:
+        # службові файли (звіт перевірки КЕП, lock-файли) — однозначні незалежно від папки
+        return _result(name_hits[0][1], 0.95, 'service', f'name:{name_hits[0][2]}', None, extra,
+                       sorted({c for _, c, _ in name_hits[1:]})[:3])
 
     if name_hits:
         scored = []
@@ -182,6 +195,8 @@ def classify(name: str, mime: str = '', folders: tuple = ()) -> dict:
         conf = 0.65 if dist == 0 else 0.5
         return _result(code, conf, 'folder', f'folder[{dist}]:{hit}', None, extra)
 
+    if flags['is_zip']:
+        return _result('00.02', 0.6, 'archive', 'archive', None, extra)
     if creditor:
         # у назві лише кредитор («Мілоан 01.05.2025.pdf») — найімовірніше документ по боргу
         return _result('14.07', 0.5, 'creditor', f'creditor:{creditor}', None, extra)

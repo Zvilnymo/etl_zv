@@ -81,7 +81,7 @@ def build_record(f: dict, root: dict, path: list) -> dict:
         'rule': res['rule'],
         'alt_doc_type': res['alt_doc_type'],
         'also_contains': res['also_contains'],
-        'parse': res['parse'],
+        'parse': 'unzip' if res['is_zip'] and res['parse'] != 'skip' else res['parse'],
         'sensitive': res['sensitive'],
         'subject': res['subject'],
         'creditor': res['creditor'],
@@ -90,6 +90,7 @@ def build_record(f: dict, root: dict, path: list) -> dict:
         'needs_check': res['needs_check'],
         'is_copy': res['is_copy'],
         'signed_container': res['signed_container'],
+        'is_zip': res['is_zip'],
         'is_override': False,
         'client_key': client_key(client['id']) if client else client_key(root['id'], 'R'),
         'client_folder_id': client['id'] if client else None,
@@ -166,7 +167,7 @@ _DIM_SQL = {
 _FACT_COLS = [
     'file_id', 'doc_type', 'block', 'confidence', 'method', 'rule', 'alt_doc_type', 'also_contains', 'parse',
     'sensitive', 'subject', 'creditor', 'is_archived', 'not_for_court', 'needs_check', 'is_copy',
-    'signed_container', 'is_override', 'client_key', 'client_folder_id', 'client_folder', 'client_phone',
+    'signed_container', 'is_zip', 'is_override', 'client_key', 'client_folder_id', 'client_folder', 'client_phone',
     'root_id', 'root_name', 'path', 'parent_id', 'file_name', 'mime_type', 'size_bytes', 'md5', 'created_time',
     'modified_time', 'web_view_link', 'classifier_version',
 ]

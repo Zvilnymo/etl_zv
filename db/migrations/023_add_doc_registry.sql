@@ -69,7 +69,7 @@ CREATE TABLE IF NOT EXISTS docs.fact_documents (
     rule                TEXT,
     alt_doc_type        TEXT,
     also_contains       TEXT[],
-    parse               TEXT,
+    parse               TEXT,              -- ocr | text | table | unzip | skip
     sensitive           BOOLEAN NOT NULL DEFAULT FALSE,
     subject             TEXT,              -- debtor | relative
     creditor            TEXT,
@@ -78,6 +78,7 @@ CREATE TABLE IF NOT EXISTS docs.fact_documents (
     needs_check         BOOLEAN NOT NULL DEFAULT FALSE,
     is_copy             BOOLEAN NOT NULL DEFAULT FALSE,
     signed_container    BOOLEAN NOT NULL DEFAULT FALSE,
+    is_zip              BOOLEAN NOT NULL DEFAULT FALSE,   -- архів: тип за назвою, парсити після розпакування
     is_override         BOOLEAN NOT NULL DEFAULT FALSE,
     client_key          TEXT NOT NULL,
     client_folder_id    TEXT,
