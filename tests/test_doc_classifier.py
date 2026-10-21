@@ -2,6 +2,8 @@
 Калібрувальні кейси класифікатора — реальні шаблони назв з Google Диска (ПІБ замінено).
   python -m pytest tests/test_doc_classifier.py
 """
+import re
+
 import pytest
 
 from etl.gdrive.classifier import classify
@@ -31,7 +33,10 @@ CASES = [
     ('Споживчий Центр.pdf', ('відповідь кредиторів',) + CLIENT, '14.04'),
     ('ЮНІТ КАПІТАЛ (Запит адвокатський).docx', ('Запити',) + CLIENT, '15.01'),
     ('ЮНІТ КАПІТАЛ (Згода).docx', ('Запити',) + CLIENT, '15.04'),
-    ('«ФК „БІКСБІТ“»(Запит).docx', ('АДВ 09.07.26',) + CLIENT, '15.02'),
+    ('«ФК „БІКСБІТ“»(Запит).docx', ('АДВ 09.07.26',) + CLIENT, '15.01'),
+    ('«ФК „БІКСБІТ“»(Запит).docx', ('Запити',) + CLIENT, '15.02'),
+    ('ФК ЕЙС. ЗАПИТ.docx', ('АДВ Петренко, 25 02 2026', 'АДВ 09.07.26') + CLIENT, '15.01'),
+    ('АВЕНТУС.docx', ('Петренко запити', 'ЗАПИТИ', 'АДВ Петренко, 25 02 2026') + CLIENT, '15.01'),
     ('Відповідь мрео.pdf', ('мрео 08.07.26',) + CLIENT, '08.01'),
     ('159-зі 03-2026.pdf', ('запит мрео клієнтка+ ВІДПОВІДЬ',) + CLIENT, '08.01'),
     ('~$пит до РСЦ МВС 34404.docx', ('мрео',) + CLIENT, '00.02'),
@@ -64,7 +69,8 @@ CASES = [
     ('Пароль від ЕЦП.txt', ('ЕЦП',) + CLIENT, '25.01'),
     ('Б. План Вашого звільнення.docx', CLIENT, '00.04'),
     ('історія', CLIENT, '20.01'),
-    ('План Петренко.pdf', ('ВИКОНАННЯ ПЛАНУ',) + CLIENT, '17.11'),
+    ('План Петренко.pdf', ('ВИКОНАННЯ ПЛАНУ',) + CLIENT, '17.08'),
+    ('платіж травень.pdf', ('ВИКОНАННЯ ПЛАНУ',) + CLIENT, '17.11'),
     ('IMG_2034.jpg', CLIENT, '00.01'),
     ('Декларації Петренко.zip', ('Декларації',) + CLIENT, '17.07'),
     ('4. Заява АК. Петренко.pdf.p7s.zip.asice.zip', PROC, '18.01'),
@@ -72,12 +78,25 @@ CASES = [
     ('Запит УБКІ  Петренко.docx.p7s', ('Запити',) + CLIENT, '15.05'),
     ('Форма до РСЦ МВС 31852.docx', ('гсц', 'Запити') + CLIENT, '08.02'),
     ('НЕСУД.pdf', PERS, '12.01'),
-    ('ПОВІДОМЛЕННЯ про дострокове розірвання Договору.pdf', ('Договори та погрози',) + CLIENT, '14.01'),
+    ('ПОВІДОМЛЕННЯ про дострокове розірвання Договору.pdf', ('Договори та погрози',) + CLIENT, '14.05'),
     ('АВАНС КРЕДИТ  .pdf', ('Договори та погрози',) + CLIENT, '14.01'),
     ('Заява на участь Черкасов 37078.docx', ('Заява АК',) + CLIENT, '18.01'),
     ('sudove_rishennia.pdf', ('судові банків',) + CLIENT, '14.06'),
     ('1.pdf', ('відпов на запити',) + CLIENT, '14.04'),
     ('лист.pdf', ('попередні суд не прийняв', 'Кредитні договори') + CLIENT, '14.01'),
+    ('Договір АК Петренко.docx', ('Заява АК',) + CLIENT, '18.03'),
+    ('АК. Договір Петренко.docx', ('Заява АК',) + CLIENT, '18.03'),
+    ('оплата 1 АК.pdf', ('Заява АК',) + CLIENT, '18.02'),
+    ('АК Петренко.pdf', PROC, '18.01'),
+    ('Квитанція ЖКП.pdf', ('Витрати',) + CLIENT, '06.01'),
+    ('майно батько Петренко.pdf', ('майно родичі',) + PERS, '05.05'),
+    ('пенсійне мати.pdf', PERS, '02.04'),
+    ('податкова.pdf', PERS, '05.03'),
+    ('податкова мама.pdf', PERS, '05.05'),
+    ('податкова чоловіка.pdf', PERS, '05.05'),
+    ('податковий номер.pdf', PERS, '01.02'),
+    ('зарахування МАНІВЕО.pdf', ('отримання коштів',) + CLIENT, '14.10'),
+    ('photo_2026.jpg', ('отримання коштів',) + CLIENT, '14.10'),
 ]
 
 
@@ -105,3 +124,30 @@ def test_codebook_consistent():
     assert {l['doc_type'] for l in cb['links']} <= codes
     assert len({f['field_code'] for f in cb['fields']}) == len(cb['fields'])
     assert len({f['crm_code'] for f in cb['fields']}) == len(cb['fields'])
+
+
+def test_evidence_links_are_document_fields():
+    cb = build()
+    by_code = {f['field_code']: f for f in cb['fields']}
+    for l in cb['links']:
+        if l['link_type'] == 'evidence':
+            f = by_code[l['field_code']]
+            assert f['role'] == 'Доказ: реквізити / відомості з документа', l
+            assert not re.match(r'Кредитор\s+\d+|\[АРХІВ', f['crm_name']), l
+
+
+def test_field_codes_survive_catalog_edits(tmp_path):
+    import openpyxl
+    from etl.gdrive.codebook import DEFAULT_CATALOG, FIELDS_SHEET, load_fields
+
+    codes = {}
+    before = {f['crm_code']: f['field_code'] for f in load_fields(DEFAULT_CATALOG, codes)}
+    wb = openpyxl.load_workbook(DEFAULT_CATALOG)
+    ws = wb[FIELDS_SHEET]
+    removed = ws.cell(row=10, column=2).value
+    ws.delete_rows(10)
+    path = tmp_path / 'catalog.xlsx'
+    wb.save(path)
+    after = {f['crm_code']: f['field_code'] for f in load_fields(str(path), codes)}
+    assert removed not in after
+    assert all(after[c] == before[c] for c in after)

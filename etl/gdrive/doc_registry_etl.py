@@ -32,7 +32,7 @@ from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-CLASSIFIER_VERSION = '2026-10-20.1'
+CLASSIFIER_VERSION = '2026-10-21.1'
 BATCH_SIZE = 2000
 DEFAULT_ROOTS = '14kOu9JKNWxrXFCt3F0AhTtjy2s7njHuE:Клієнти,1mLXcs9w79Kg2Xbi42AiXFZ4bxSwE3ALM:Клієнти_клон'
 _PHONE_RE = re.compile(r'(?:\+?38)?\s?\(?0\d{2}\)?[\s-]?\d{3}[\s-]?\d{2}[\s-]?\d{2}')
@@ -44,11 +44,14 @@ def get_roots():
         fid, _, name = part.strip().partition(':')
         if fid:
             roots.append({'id': fid, 'name': name or fid})
+    if not roots:
+        raise RuntimeError('GDRIVE_CLIENT_ROOTS порожній — немає папок для обходу')
     return roots
 
 
 def client_key(folder_id: str, prefix: str = 'K') -> str:
-    return prefix + hashlib.sha1(folder_id.encode()).hexdigest()[:7].upper()
+    # 44 біти SHA-1: імовірність колізії на ~100k папок клієнтів ≈ 3e-4
+    return prefix + hashlib.sha1(folder_id.encode()).hexdigest()[:11].upper()
 
 
 def parse_phone(text: str):
@@ -155,12 +158,7 @@ _DIM_SQL = {
             n_evidence_fields = EXCLUDED.n_evidence_fields, n_output_fields = EXCLUDED.n_output_fields""",
     'fields': """
         INSERT INTO docs.dim_crm_fields (field_code, crm_code, crm_name, crm_type, block, role, fixes,
-                                         data_nature, evidence, used_in, max_fill_pct, entities) VALUES %s
-        ON CONFLICT (field_code) DO UPDATE SET
-            crm_code = EXCLUDED.crm_code, crm_name = EXCLUDED.crm_name, crm_type = EXCLUDED.crm_type,
-            block = EXCLUDED.block, role = EXCLUDED.role, fixes = EXCLUDED.fixes,
-            data_nature = EXCLUDED.data_nature, evidence = EXCLUDED.evidence, used_in = EXCLUDED.used_in,
-            max_fill_pct = EXCLUDED.max_fill_pct, entities = EXCLUDED.entities""",
+                                         data_nature, evidence, used_in, max_fill_pct, entities) VALUES %s""",
     'links': "INSERT INTO docs.doc_type_fields (doc_type, field_code, link_type) VALUES %s",
 }
 
@@ -183,19 +181,27 @@ _FACT_UPSERT = f"""
                                  THEN docs.fact_documents.doc_instance_code END,
         etl_loaded_at     = NOW()
 """
+# Лічильник номерів ніколи не зменшується: код видаленого / перекласифікованого документа не дістанеться іншому файлу
+_SYNC_COUNTERS = """
+    INSERT INTO docs.doc_seq_counters (client_key, doc_type, last_seq)
+    SELECT client_key, doc_type, MAX(doc_seq) FROM docs.fact_documents
+    WHERE doc_seq IS NOT NULL GROUP BY client_key, doc_type
+    ON CONFLICT (client_key, doc_type) DO UPDATE
+        SET last_seq = GREATEST(docs.doc_seq_counters.last_seq, EXCLUDED.last_seq)
+"""
 _ASSIGN_CODES = """
-    WITH mx AS (
-        SELECT client_key, doc_type, COALESCE(MAX(doc_seq), 0) AS m
-        FROM docs.fact_documents GROUP BY client_key, doc_type
-    ), nw AS (
-        SELECT file_id, client_key, doc_type,
-               ROW_NUMBER() OVER (PARTITION BY client_key, doc_type ORDER BY created_time, file_id) AS rn
-        FROM docs.fact_documents WHERE doc_seq IS NULL
+    WITH nw AS (
+        SELECT f.file_id, COALESCE(c.last_seq, 0) + ROW_NUMBER() OVER (
+                   PARTITION BY f.client_key, f.doc_type ORDER BY f.created_time, f.file_id) AS seq
+        FROM docs.fact_documents f
+        LEFT JOIN docs.doc_seq_counters c USING (client_key, doc_type)
+        WHERE f.doc_seq IS NULL
     )
     UPDATE docs.fact_documents f
-    SET doc_seq = mx.m + nw.rn,
-        doc_instance_code = 'ZV-' || f.doc_type || '-' || f.client_key || '-' || LPAD((mx.m + nw.rn)::text, 4, '0')
-    FROM nw JOIN mx USING (client_key, doc_type)
+    SET doc_seq = nw.seq,
+        doc_instance_code = 'ZV-' || f.doc_type || '-' || f.client_key || '-'
+                            || CASE WHEN nw.seq < 10000 THEN LPAD(nw.seq::text, 4, '0') ELSE nw.seq::text END
+    FROM nw
     WHERE f.file_id = nw.file_id
 """
 
@@ -207,11 +213,14 @@ def sync_codebook(conn, cb: dict):
         ex(cur, _DIM_SQL['doc_types'], [
             (d['doc_type'], d['doc_code'], d['block'], d['name'], d['kind'], d['parse'], d['sensitive'],
              d['n_scan_fields'], d['n_evidence_fields'], d['n_output_fields']) for d in cb['doc_types']])
+        # поля перезаливаються цілком в одній транзакції: коди постійні (field_codes.json), а поля,
+        # яких більше немає в каталозі, мають зникнути разом зі звʼязками
+        cur.execute('DELETE FROM docs.doc_type_fields')
+        cur.execute('DELETE FROM docs.dim_crm_fields')
         ex(cur, _DIM_SQL['fields'], [
             (f['field_code'], f['crm_code'], f['crm_name'], f['crm_type'], f['block'], f['role'], f['fixes'],
              f['data_nature'], f['evidence'], f['used_in'], f['max_fill_pct'], f['entities'])
             for f in cb['fields']], page_size=500)
-        cur.execute('DELETE FROM docs.doc_type_fields')
         ex(cur, _DIM_SQL['links'], [(l['doc_type'], l['field_code'], l['link_type']) for l in cb['links']],
            page_size=1000)
     conn.commit()
@@ -243,10 +252,35 @@ def finalize(conn, seen_ids=None, root_ids=None):
                 WHERE f.root_id = ANY(%s) AND NOT EXISTS (SELECT 1 FROM _seen s WHERE s.file_id = f.file_id)
             """, (root_ids,))
             deleted = cur.rowcount
+        cur.execute(_SYNC_COUNTERS)
         cur.execute(_ASSIGN_CODES)
         coded = cur.rowcount
+        cur.execute(_SYNC_COUNTERS)
     conn.commit()
     return deleted, coded
+
+
+def get_watermark(conn):
+    with conn.cursor() as cur:
+        cur.execute("SELECT value FROM docs.etl_state WHERE key = 'incremental_since'")
+        row = cur.fetchone()
+    return row[0] if row else None
+
+
+def set_watermark(conn, value: datetime):
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO docs.etl_state (key, value) VALUES ('incremental_since', %s)
+            ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
+        """, (value,))
+    conn.commit()
+
+
+def read_codes(conn, file_ids) -> dict:
+    with conn.cursor() as cur:
+        cur.execute('SELECT file_id, doc_seq, doc_instance_code FROM docs.fact_documents WHERE file_id = ANY(%s)',
+                    (list(file_ids),))
+        return {fid: (seq, code) for fid, seq, code in cur.fetchall()}
 
 
 # ---------------------------------------------------------------- основний цикл
@@ -259,7 +293,10 @@ def _iter_full(client: DriveClient, roots, limit_clients):
 def _iter_incremental(client: DriveClient, roots, since: datetime):
     roots_by_id = {r['id']: r for r in roots}
     cache = {}
-    q = (f"modifiedTime > '{since.strftime('%Y-%m-%dT%H:%M:%S')}' and trashed = false "
+    ts = since.strftime('%Y-%m-%dT%H:%M:%S')
+    # createdTime ловить файли, завантажені зі старим modifiedTime (Drive for Desktop, API).
+    # Переміщення між папками та видалення інкремент не бачить — їх виправляє повний запуск.
+    q = (f"(modifiedTime > '{ts}' or createdTime > '{ts}') and trashed = false "
          f"and mimeType != 'application/vnd.google-apps.folder'")
     for f in client.list_query(q):
         root, path = client.resolve_path(f, roots_by_id, cache)
@@ -270,6 +307,7 @@ def _iter_incremental(client: DriveClient, roots, since: datetime):
 def run(mode: str = 'full', use_db: bool = True, limit_clients: int = None,
         csv_path: str = None, xlsx_path: str = None) -> dict:
     started = time.monotonic()
+    run_started_at = datetime.now(timezone.utc)
     cb = load_codebook()
     roots = get_roots()
     client = DriveClient()
@@ -284,12 +322,12 @@ def run(mode: str = 'full', use_db: bool = True, limit_clients: int = None,
             sync_codebook(conn, cb)
             overrides = load_overrides(conn)
             if mode == 'incremental':
-                with conn.cursor() as cur:
-                    cur.execute('SELECT MAX(modified_time) FROM docs.fact_documents')
-                    since = cur.fetchone()[0]
+                # вікно — від початку останнього успішного запуску (не від MAX(modified_time):
+                # файл з modifiedTime у майбутньому або пропущений через помилку зсунув би його назавжди)
+                since = get_watermark(conn)
                 if since is None:
-                    raise RuntimeError('Реєстр порожній — спершу повний запуск (--mode doc-registry)')
-                since = since.astimezone(timezone.utc) - timedelta(hours=1)
+                    raise RuntimeError('Немає мітки інкременту — спершу повний запуск (--mode doc-registry)')
+                since = min(since.astimezone(timezone.utc), run_started_at) - timedelta(hours=1)
 
         source = _iter_incremental(client, roots, since) if mode == 'incremental' \
             else _iter_full(client, roots, limit_clients)
@@ -302,6 +340,8 @@ def run(mode: str = 'full', use_db: bool = True, limit_clients: int = None,
         if csv_writer:
             csv_writer.writeheader()
         for f, root, path in source:
+            if f['id'] in seen:      # файл з кількома батьками або дубль між сторінками видачі
+                continue
             rec = build_record(f, root, path)
             if rec['file_id'] in overrides:
                 apply_override(rec, overrides[rec['file_id']])
@@ -325,9 +365,17 @@ def run(mode: str = 'full', use_db: bool = True, limit_clients: int = None,
                 upsert_batch(conn, batch)
             full_scan = mode == 'full' and limit_clients is None and client.crawl_errors == 0
             deleted, coded = finalize(conn, seen if full_scan else None, [r['id'] for r in roots])
+            # мітка інкременту зсувається лише після запуску без помилок (і не після пілоту з --limit-clients)
+            if client.crawl_errors == 0 and limit_clients is None:
+                set_watermark(conn, run_started_at)
 
         if xlsx_path:
             assign_codes_offline(records)
+            if conn is not None:
+                # в Excel — ті самі коди, що в БД
+                codes = read_codes(conn, [r['file_id'] for r in records])
+                for r in records:
+                    r['doc_seq'], r['doc_instance_code'] = codes.get(r['file_id'], (None, None))
             fields = _fields_by_type(cb)
             for r in records:
                 r['crm_fields'] = fields.get(r['doc_type'])

@@ -13,7 +13,9 @@ import queue
 import threading
 import time
 
+from google.auth.exceptions import TransportError
 from google.auth.transport.requests import AuthorizedSession
+from requests.exceptions import ChunkedEncodingError, ConnectionError as RequestsConnectionError, Timeout
 from google.oauth2.service_account import Credentials
 
 from utils.logger import get_logger
@@ -24,6 +26,8 @@ SCOPES = ['https://www.googleapis.com/auth/drive.readonly']
 API = 'https://www.googleapis.com/drive/v3/files'
 FOLDER_MIME = 'application/vnd.google-apps.folder'
 SHORTCUT_MIME = 'application/vnd.google-apps.shortcut'
+MAX_DEPTH = 12  # спільна межа глибини для повного обходу та resolve_path
+_TRANSIENT = (RequestsConnectionError, Timeout, ChunkedEncodingError, TransportError)
 FILE_FIELDS = ('id,name,mimeType,size,md5Checksum,createdTime,modifiedTime,webViewLink,parents,trashed,'
                'shortcutDetails(targetId,targetMimeType)')
 
@@ -50,6 +54,7 @@ class DriveClient:
         self.max_retries = max_retries
         self.calls = 0
         self.crawl_errors = 0
+        self._err_lock = threading.Lock()
 
     def _session(self) -> AuthorizedSession:
         if not hasattr(self._local, 'session'):
@@ -58,7 +63,15 @@ class DriveClient:
 
     def _get(self, url: str, params: dict) -> dict:
         for attempt in range(self.max_retries):
-            resp = self._session().get(url, params=params, timeout=60)
+            try:
+                resp = self._session().get(url, params=params, timeout=60)
+            except _TRANSIENT as e:
+                if attempt == self.max_retries - 1:
+                    raise
+                logger.warning(f'Drive: мережева помилка {e!r}, повтор {attempt + 1}')
+                del self._local.session          # не перевикористовувати зламане зʼєднання
+                time.sleep(min(2 ** attempt, 60))
+                continue
             self.calls += 1
             if resp.status_code == 200:
                 return resp.json()
@@ -94,7 +107,11 @@ class DriveClient:
     def list_children(self, folder_id: str):
         return self.list_query(f"'{folder_id}' in parents and trashed = false")
 
-    def crawl(self, roots: list, workers: int = 8, max_depth: int = 12, client_limit: int = None):
+    def count_error(self):
+        with self._err_lock:
+            self.crawl_errors += 1
+
+    def crawl(self, roots: list, workers: int = 8, max_depth: int = MAX_DEPTH, client_limit: int = None):
         """
         Обхід дерева папок у ширину, паралельно (workers потоків).
         Повертає генератор файлів (не папок) з додатковими ключами:
@@ -139,7 +156,7 @@ class DriveClient:
                             results.put(f)
                 except Exception as e:
                     logger.error(f'Drive: не вдалося прочитати папку {folder_id}: {e}')
-                    self.crawl_errors += 1
+                    self.count_error()
                 finally:
                     with pending_lock:
                         pending[0] -= 1
@@ -147,6 +164,8 @@ class DriveClient:
                     if done:
                         results.put(None)
 
+        if not roots:
+            raise ValueError('crawl(): порожній список коренів')
         for r in roots:
             submit(r['id'], r, [])
 
@@ -174,10 +193,12 @@ class DriveClient:
         """
         Для інкременту: піднімається parents до одного з коренів.
         Повертає (root, path) або (None, None), якщо файл не в клієнтських папках.
+        Помилка API не кешується: файл рахується в crawl_errors (статус запуску 'partial'),
+        а сам файл повертається як (None, 'error').
         """
         chain = []
         parent = (file.get('parents') or [None])[0]
-        for _ in range(20):
+        for _ in range(MAX_DEPTH + 1):
             if parent is None:
                 return None, None
             if parent in roots_by_id:
@@ -185,13 +206,12 @@ class DriveClient:
             if parent not in cache:
                 try:
                     meta = self.get_file(parent)
-                except Exception:
-                    cache[parent] = None
-                    return None, None
+                except Exception as e:
+                    logger.error(f"Drive: не вдалося визначити шлях файлу {file.get('id')} (папка {parent}): {e}")
+                    self.count_error()
+                    return None, 'error'
                 cache[parent] = {'id': meta['id'], 'name': meta['name'], 'parent': (meta.get('parents') or [None])[0]}
             node = cache[parent]
-            if node is None:
-                return None, None
             chain.append({'id': node['id'], 'name': node['name']})
             parent = node['parent']
         return None, None

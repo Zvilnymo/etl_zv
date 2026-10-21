@@ -9,8 +9,9 @@
 
 Коди:
   ZV-BB.TT          — тип документа (taxonomy.DOC_TYPES)
-  ZV-F-BB.NNN       — поле CRM: BB — блок справи поля, NNN — порядковий номер поля в блоці
-                      (за № у каталозі; стабільний, поки каталог дописується в кінець)
+  ZV-F-BB.NNN       — поле CRM: BB — блок справи поля на момент першого присвоєння, NNN — номер у блоці.
+                      Код постійний: карта crm_code → field_code зберігається в etl/gdrive/field_codes.json,
+                      нові поля отримують наступний вільний номер, коди не перенумеровуються й не перевикористовуються.
 """
 import argparse
 import json
@@ -20,11 +21,15 @@ from collections import defaultdict
 
 import openpyxl
 
-from etl.gdrive.taxonomy import BLOCKS, DOC_TYPES, OUTPUT_COLUMNS, full_code
+from etl.gdrive.taxonomy import (
+    BLOCKS, DOC_TYPES, EVIDENCE_EXCLUDE_ENTITIES, EVIDENCE_EXCLUDE_NAME_PATTERNS, EVIDENCE_ROLE, OUTPUT_COLUMNS,
+    full_code,
+)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DEFAULT_CATALOG = os.path.join(ROOT, 'data', 'doc_registry', 'crm_fields_catalog.xlsx')
 CODEBOOK_JSON = os.path.join(ROOT, 'etl', 'gdrive', 'codebook.json')
+FIELD_CODES_JSON = os.path.join(ROOT, 'etl', 'gdrive', 'field_codes.json')
 CODEBOOK_XLSX = os.path.join(ROOT, 'data', 'doc_registry', 'doc_codebook.xlsx')
 
 FIELDS_SHEET = 'Поля → юридичний сенс'
@@ -47,22 +52,44 @@ def _entities(where: str):
     return out
 
 
-def load_fields(catalog_path: str):
+def _load_field_codes(path: str = FIELD_CODES_JSON) -> dict:
+    if os.path.exists(path):
+        with open(path, encoding='utf-8') as fh:
+            return json.load(fh)
+    return {}
+
+
+def _save_field_codes(codes: dict, path: str = FIELD_CODES_JSON):
+    with open(path, 'w', encoding='utf-8') as fh:
+        json.dump(dict(sorted(codes.items(), key=lambda kv: kv[1])), fh, ensure_ascii=False, indent=0)
+
+
+def load_fields(catalog_path: str, field_codes: dict = None):
+    """field_codes — постійна карта crm_code → field_code; доповнюється новими полями на місці."""
+    field_codes = {} if field_codes is None else field_codes
     ws = openpyxl.load_workbook(catalog_path, read_only=True)[FIELDS_SHEET]
     rows = ws.iter_rows(values_only=True)
     header = list(next(rows))
     idx = {k: header.index(v) for k, v in COLS.items()}
     out_idx = {col: header.index(col) for col in OUTPUT_COLUMNS.values()}
 
-    fields, seq = [], defaultdict(int)
+    seq = defaultdict(int)
+    for code in field_codes.values():
+        block, n = code[len('ZV-F-'):].split('.')
+        seq[block] = max(seq[block], int(n))
+
+    fields = []
     for r in rows:
         if r[idx['crm_code']] is None:
             continue
         block = str(r[idx['block']] or '').split('.')[0].strip().zfill(2)
-        seq[block] += 1
+        crm_code = r[idx['crm_code']]
+        if crm_code not in field_codes:
+            seq[block] += 1
+            field_codes[crm_code] = f'ZV-F-{block}.{seq[block]:03d}'
         ents = _entities(r[idx['where']])
         fields.append({
-            'field_code': f'ZV-F-{block}.{seq[block]:03d}',
+            'field_code': field_codes[crm_code],
             'crm_code': r[idx['crm_code']],
             'crm_name': r[idx['crm_name']],
             'crm_type': r[idx['type']],
@@ -80,8 +107,26 @@ def load_fields(catalog_path: str):
     return fields
 
 
-def build(catalog_path: str = DEFAULT_CATALOG) -> dict:
-    fields = load_fields(catalog_path)
+_EXCLUDE_NAME_RX = [re.compile(p) for p in EVIDENCE_EXCLUDE_NAME_PATTERNS]
+
+
+def is_evidence_field(f: dict) -> bool:
+    """Поле, яке реально заповнюється з одного документа (а не слот, агрегат, технічне чи судове поле)."""
+    return (
+        f['role'] == EVIDENCE_ROLE
+        and f['crm_type'] not in ('crm', 'crm_entity', 'file')
+        and not any(rx.search(f['crm_name'] or '') for rx in _EXCLUDE_NAME_RX)
+        and not (f['entities'] and set(f['entities']) <= EVIDENCE_EXCLUDE_ENTITIES)
+    )
+
+
+def is_output_field(f: dict) -> bool:
+    return f['role'] != 'Технічне: шаблон документа' and f['crm_type'] != 'file'
+
+
+def build(catalog_path: str = DEFAULT_CATALOG, field_codes: dict = None) -> dict:
+    field_codes = _load_field_codes() if field_codes is None else field_codes
+    fields = load_fields(catalog_path, field_codes)
     by_crm = {f['crm_code']: f for f in fields}
     by_evidence = defaultdict(list)
     for f in fields:
@@ -98,19 +143,29 @@ def build(catalog_path: str = DEFAULT_CATALOG) -> dict:
                 raise ValueError(f"{d['code']}: file-поле {crm} відсутнє в каталозі")
             links.append(_link(d, f, 'scan'))
             seen.add(crm)
+        for crm in d['extra_fields']:
+            f = by_crm.get(crm)
+            if f is None:
+                raise ValueError(f"{d['code']}: поле {crm} відсутнє в каталозі")
+            if crm not in seen:
+                links.append(_link(d, f, 'extra'))
+                seen.add(crm)
         for key in d['evidence']:
             used_evidence.add(key)
             for f in by_evidence.get(key, []):
-                if f['crm_code'] not in seen and f['role'] != 'Доказ: скан первинного документа':
+                if f['crm_code'] not in seen and is_evidence_field(f):
                     links.append(_link(d, f, 'evidence'))
                     seen.add(f['crm_code'])
         if d['code'] in OUTPUT_COLUMNS:
             col = OUTPUT_COLUMNS[d['code']]
             for f in fields:
-                if col in f['used_in'] and f['crm_code'] not in seen:
+                if col in f['used_in'] and f['crm_code'] not in seen and is_output_field(f):
                     links.append(_link(d, f, 'output'))
                     seen.add(f['crm_code'])
 
+    # Звʼязки, яких у CRM поки немає: тип документа посилається на «Первинний документ-доказ»,
+    # під який у каталозі немає жодного поля → документ реєструється, але парсити його нікуди
+    gaps = sorted({(d['code'], b, k) for d in DOC_TYPES for b, k in d['evidence'] if (b, k) not in by_evidence})
     unmapped = sorted(set(by_evidence) - used_evidence)
     if unmapped:
         raise ValueError(f'Рядки «Первинний документ-доказ» без типу документа: {unmapped}')
@@ -134,7 +189,7 @@ def build(catalog_path: str = DEFAULT_CATALOG) -> dict:
             'folder_patterns': d['folder_patterns'],
             'scan_fields': d['scan_fields'],
             'n_scan_fields': n_links[d['code']]['scan'],
-            'n_evidence_fields': n_links[d['code']]['evidence'],
+            'n_evidence_fields': n_links[d['code']]['evidence'] + n_links[d['code']]['extra'],
             'n_output_fields': n_links[d['code']]['output'],
         })
 
@@ -143,6 +198,7 @@ def build(catalog_path: str = DEFAULT_CATALOG) -> dict:
         'doc_types': doc_types,
         'fields': fields,
         'links': links,
+        'gaps': [{'doc_type': c, 'block': f'{b:02d}', 'evidence': k} for c, b, k in gaps],
     }
 
 
@@ -181,11 +237,13 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--catalog', default=DEFAULT_CATALOG)
     args = ap.parse_args()
-    cb = build(args.catalog)
+    codes = _load_field_codes()
+    cb = build(args.catalog, codes)
+    _save_field_codes(codes)
     write_json(cb)
     write_xlsx(cb)
     print(f"blocks={len(cb['blocks'])} doc_types={len(cb['doc_types'])} "
-          f"fields={len(cb['fields'])} links={len(cb['links'])}")
+          f"fields={len(cb['fields'])} links={len(cb['links'])} gaps={len(cb['gaps'])}")
 
 
 if __name__ == '__main__':

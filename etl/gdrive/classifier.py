@@ -147,12 +147,14 @@ def classify(name: str, mime: str = '', folders: tuple = ()) -> dict:
             name_hits.append((100 + prio * 10 + min(len(hit), 30), code, hit))
     name_hits.sort(reverse=True)
 
-    folder_hit = None  # (code, distance, matched text, folder name)
+    folder_hits = []  # (code, distance, matched text, folder name) для всіх папок нижче папки клієнта
     for dist, folder in enumerate(folders[:-1] if len(folders) > 1 else folders):
         res = _classify_folder(folder)
         if res:
-            folder_hit = (res[0], dist, res[2], folder)
-            break
+            folder_hits.append((res[0], dist, res[2], folder))
+    folder_hit = folder_hits[0] if folder_hits else None
+    # «АДВ <дата>/ЗАПИТИ/…»: запити всередині пакета адвокатських запитів — адвокатські (15.01), не звичайні
+    adv_ancestor = any(h[0] == '15.01' for h in folder_hits)
 
     group_blocks = next((blocks for t in folder_texts[:-1] or folder_texts
                          for rx, blocks in group_rx if rx.search(t)), None)
@@ -187,12 +189,16 @@ def classify(name: str, mime: str = '', folders: tuple = ()) -> dict:
         if len(scored) > 1 and scored[1][1][:2] != code[:2] and scored[0][0] - scored[1][0] < 10:
             conf -= 0.1
         alt = scored[1][1] if len(scored) > 1 else None
-        others = sorted({c for _, c, _ in scored[1:] if c[:2] != code[:2]})[:3]
+        others = sorted({c for _, c, _ in scored[1:] if c != code})[:3]
+        if code == '15.02' and adv_ancestor:
+            code, conf, method = '15.01', 0.85, 'name+folder_adv'
         return _result(code, conf, method, f'name:{hit}', alt, extra, others)
 
     if folder_hit:
         code, dist, hit, folder = folder_hit
         conf = 0.65 if dist == 0 else 0.5
+        if code == '15.02' and adv_ancestor:
+            code, conf = '15.01', 0.6
         return _result(code, conf, 'folder', f'folder[{dist}]:{hit}', None, extra)
 
     if flags['is_zip']:

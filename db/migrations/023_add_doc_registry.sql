@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS docs.dim_crm_fields (
 CREATE TABLE IF NOT EXISTS docs.doc_type_fields (
     doc_type    TEXT NOT NULL REFERENCES docs.dim_doc_types (doc_type),
     field_code  TEXT NOT NULL REFERENCES docs.dim_crm_fields (field_code),
-    link_type   TEXT NOT NULL,             -- scan | evidence | output
+    link_type   TEXT NOT NULL,             -- scan | evidence | extra | output
     PRIMARY KEY (doc_type, field_code)
 );
 
@@ -104,6 +104,21 @@ CREATE INDEX IF NOT EXISTS fact_documents_doc_type_idx ON docs.fact_documents (d
 CREATE INDEX IF NOT EXISTS fact_documents_phone_idx    ON docs.fact_documents (client_phone);
 CREATE INDEX IF NOT EXISTS fact_documents_md5_idx      ON docs.fact_documents (client_key, md5);
 
+-- Останній виданий порядковий номер документа типу в клієнта (не зменшується → коди не перевикористовуються)
+CREATE TABLE IF NOT EXISTS docs.doc_seq_counters (
+    client_key  TEXT NOT NULL,
+    doc_type    TEXT NOT NULL,
+    last_seq    INTEGER NOT NULL,
+    PRIMARY KEY (client_key, doc_type)
+);
+
+-- Стан ETL (мітка інкременту: початок останнього успішного запуску)
+CREATE TABLE IF NOT EXISTS docs.etl_state (
+    key         TEXT PRIMARY KEY,
+    value       TIMESTAMPTZ NOT NULL,
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Реєстр з назвами та ознакою дубля за вмістом
 CREATE OR REPLACE VIEW docs.vw_document_registry AS
 SELECT
@@ -150,6 +165,7 @@ SELECT
     r.doc_type_name,
     r.parse,
     r.confidence,
+    r.subject,                               -- relative: документ родича — не заповнювати поля самого боржника
     r.client_key,
     r.client_phone,
     r.file_id,
@@ -165,7 +181,7 @@ WHERE r.parse <> 'skip'
   AND NOT r.sensitive
   AND NOT r.is_archived
   AND NOT r.is_duplicate
-GROUP BY r.doc_instance_code, r.doc_code, r.doc_type_name, r.parse, r.confidence,
+GROUP BY r.doc_instance_code, r.doc_code, r.doc_type_name, r.parse, r.confidence, r.subject,
          r.client_key, r.client_phone, r.file_id, r.file_name, r.mime_type, r.web_view_link;
 
 -- Зведення по сегментах

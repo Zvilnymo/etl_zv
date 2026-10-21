@@ -109,6 +109,18 @@ def _add_codebook_sheets(wb, cb):
              l['fixes'], l['data_nature'], l['max_fill_pct'], l['entities']) for l in cb['links']],
            [12, 50, 9, 14, 26, 36, 40, 30, 10, 50])
 
+    by_type = defaultdict(lambda: Counter())
+    for l in cb['links']:
+        by_type[l['doc_type']][l['link_type']] += 1
+    _sheet(wb, 'Прогалини CRM',
+           ['Код документа', 'Тип документа', 'Звʼязків з полями', 'Первинний документ-доказ без полів у CRM (блок)'],
+           [(d['doc_code'], d['name'], sum(by_type[d['doc_type']].values()),
+             '; '.join(f"{g['block']}: {g['evidence']}" for g in cb.get('gaps', []) if g['doc_type'] == d['doc_type']))
+            for d in cb['doc_types']
+            if d['kind'] == 'evidence' and (not by_type[d['doc_type']]
+                                            or any(g['doc_type'] == d['doc_type'] for g in cb.get('gaps', [])))],
+           [12, 60, 12, 90])
+
 
 REGISTRY_COLUMNS = [
     ('doc_instance_code', 'Код документа (екземпляр)'),
