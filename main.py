@@ -469,7 +469,11 @@ def run_doc_registry(mode: str):
     today = date.today()
     logger.info(f'=== DOC REGISTRY ({mode}) ===')
     res = doc_registry_etl.run(mode)
-    _log_run('gdrive_doc_registry', f'doc-registry-{mode}', today, today, res)
+    log_res = res
+    if res['status'] == 'partial':
+        # crm.etl_runs знає лише success / error: частковий запуск логуємо як error з поясненням
+        log_res = {**res, 'status': 'error', 'error': 'partial: були помилки обходу Google Диска, див. лог'}
+    _log_run('gdrive_doc_registry', {'full': 'doc-registry', 'incremental': 'doc-reg-incr'}[mode], today, today, log_res)
     if res['status'] == 'error':
         logger.error(f'Doc registry failed: {res["error"]}')
     else:

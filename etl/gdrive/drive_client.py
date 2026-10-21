@@ -15,7 +15,7 @@ import time
 
 from google.auth.exceptions import TransportError
 from google.auth.transport.requests import AuthorizedSession
-from requests.exceptions import ChunkedEncodingError, ConnectionError as RequestsConnectionError, Timeout
+from requests.exceptions import ChunkedEncodingError, ConnectionError as RequestsConnectionError, HTTPError, Timeout
 from google.oauth2.service_account import Credentials
 
 from utils.logger import get_logger
@@ -69,7 +69,7 @@ class DriveClient:
                 if attempt == self.max_retries - 1:
                     raise
                 logger.warning(f'Drive: мережева помилка {e!r}, повтор {attempt + 1}')
-                del self._local.session          # не перевикористовувати зламане зʼєднання
+                self._local.__dict__.pop('session', None)   # не перевикористовувати зламане зʼєднання
                 time.sleep(min(2 ** attempt, 60))
                 continue
             self.calls += 1
@@ -98,6 +98,9 @@ class DriveClient:
         }
         while True:
             data = self._get(API, params)
+            if data.get('incompleteSearch'):
+                logger.warning(f'Drive: неповна видача для запиту {q!r}')
+                self.count_error()
             yield from data.get('files', [])
             token = data.get('nextPageToken')
             if not token:
@@ -133,17 +136,24 @@ class DriveClient:
                 seen.add(folder_id)
             with pending_lock:
                 pending[0] += 1
-            tasks.put((folder_id, root, path))
+            tasks.put((folder_id, root, path, 0))
 
         def worker():
             while True:
                 item = tasks.get()
                 if item is None:
                     return
-                folder_id, root, path = item
+                folder_id, root, path, attempt = item
                 try:
                     clients_seen = 0
                     for f in self.list_children(folder_id):
+                        sd = f.get('shortcutDetails') or {}
+                        if f['mimeType'] == SHORTCUT_MIME:
+                            # ярлик на папку — обходимо цільову папку; ярлик на файл пропускаємо
+                            # (його id не завантажується, а сам файл лежить у своїй папці)
+                            if sd.get('targetMimeType') == FOLDER_MIME and sd.get('targetId') and len(path) < max_depth:
+                                submit(sd['targetId'], root, path + [{'id': sd['targetId'], 'name': f['name']}])
+                            continue
                         if f['mimeType'] == FOLDER_MIME:
                             if not path and client_limit is not None:
                                 clients_seen += 1
@@ -155,8 +165,16 @@ class DriveClient:
                             f['_root'], f['_path'] = root, path
                             results.put(f)
                 except Exception as e:
-                    logger.error(f'Drive: не вдалося прочитати папку {folder_id}: {e}')
-                    self.count_error()
+                    if attempt == 0:
+                        # друга спроба після паузи; файли, вже віддані з цієї папки, відсіюються в run() за id
+                        logger.warning(f'Drive: папка {folder_id} не прочиталась ({e}), повтор через 30 с')
+                        time.sleep(30)
+                        with pending_lock:
+                            pending[0] += 1
+                        tasks.put((folder_id, root, path, 1))
+                    else:
+                        logger.error(f'Drive: не вдалося прочитати папку {folder_id}: {e}')
+                        self.count_error()
                 finally:
                     with pending_lock:
                         pending[0] -= 1
@@ -206,12 +224,21 @@ class DriveClient:
             if parent not in cache:
                 try:
                     meta = self.get_file(parent)
+                except HTTPError as e:
+                    if e.response is not None and e.response.status_code in (403, 404):
+                        cache[parent] = None    # недоступна папка — файл поза клієнтськими коренями
+                        return None, None
+                    logger.error(f"Drive: не вдалося визначити шлях файлу {file.get('id')} (папка {parent}): {e}")
+                    self.count_error()
+                    return None, 'error'
                 except Exception as e:
                     logger.error(f"Drive: не вдалося визначити шлях файлу {file.get('id')} (папка {parent}): {e}")
                     self.count_error()
                     return None, 'error'
                 cache[parent] = {'id': meta['id'], 'name': meta['name'], 'parent': (meta.get('parents') or [None])[0]}
             node = cache[parent]
+            if node is None:
+                return None, None
             chain.append({'id': node['id'], 'name': node['name']})
             parent = node['parent']
         return None, None

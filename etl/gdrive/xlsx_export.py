@@ -5,6 +5,7 @@ from collections import Counter, defaultdict
 
 from openpyxl import Workbook
 from openpyxl.cell import WriteOnlyCell
+from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
 from openpyxl.styles import Alignment, Font, PatternFill
 
 _HEAD_FONT = Font(bold=True, color='FFFFFF')
@@ -66,6 +67,11 @@ def _cell(v):
         return '; '.join(str(x) for x in v)
     if isinstance(v, bool):
         return 'так' if v else ''
+    if isinstance(v, str):
+        # назви файлів з Диска — недовірений текст: «=HYPERLINK(...)» не має ставати формулою
+        v = ILLEGAL_CHARACTERS_RE.sub('', v)
+        if v.startswith(('=', '+', '-', '@')):
+            return "'" + v
     return v
 
 

@@ -14,7 +14,8 @@ import re
 from functools import lru_cache
 
 from etl.gdrive.taxonomy import (
-    CREDITORS, DOC_TYPES, DOC_TYPES_BY_CODE, FOLDER_GROUPS, RELATIVE_MARKERS, RELATIVE_REMAP, STATUS_MARKERS,
+    CREDITORS, DOC_TYPES, DOC_TYPES_BY_CODE, FAMILY_OWN_TYPES, FOLDER_GROUPS, RELATIVE_MARKERS, RELATIVE_REMAP,
+    STATUS_MARKERS,
 )
 
 _SEP_RE = re.compile(r'[_\-.,;:()\[\]{}+«»"\'`№#/\\|]+')
@@ -25,6 +26,15 @@ _ARCHIVE_EXT = ('.zip', '.rar', '.7z', '.tar', '.gz')
 # Контейнери підпису: «Заява.docx.p7s» класифікуємо за внутрішньою назвою
 _SIGNED_EXT = ('.p7s', '.asice', '.asics', '.sig')
 _SERVICE_CODES = ('00.02', '00.05')
+
+# Паролі / логіни / ключі: позначаються чутливими незалежно від того, який тип документа переміг
+_SECRET_NAME_RX = re.compile(r'парол|password|passw|\bpass\b|логін|логин|\blogin\b|\bpin\b|\bпін\b|'
+                             r'код\w* доступ|дан+[іи] для входу|данные для входа|облік\w* дан|\bецп\b|\bэцп\b|\bкеп\b|'
+                             r'\bkey ?6\b|\.(jks|pfx|p12|pk8|zs2|dat|key)$')
+_SECRET_FOLDER_RX = re.compile(r'парол|password|\bдоступи\b|логін|\bецп\b|\bэцп\b|\bкеп\b|\bключ(і|ів)?\b')
+# «Відповідь на (адвокатський) запит» — вхідна відповідь, а не сам запит
+_RESPONSE_RX = re.compile(r'(відповід|ответ)\w*\b.{0,15}\b(адв\w*\s+)?(запит|запрос|звернен|обращен)')
+_NAME_TOKEN_RX = re.compile(r"[^\W\d_][\w']{3,}")
 
 
 def normalize(text: str) -> str:
@@ -78,10 +88,21 @@ def _compiled_aux():
 
 
 def detect_creditor(text: str):
+    """Кредитор, згаданий у тексті першим ("ДФ ЄАПБ / Мілоан" → ЄАПБ)."""
+    best = None
     for canon, rxs in _compiled_aux()[0]:
-        if any(rx.search(text) for rx in rxs):
-            return canon
-    return None
+        for rx in rxs:
+            m = rx.search(text)
+            if m and (best is None or m.start() < best[0]):
+                best = (m.start(), canon)
+    return best[1] if best else None
+
+
+def _strip_client_name(text: str, client_tokens: set) -> str:
+    """Прибирає з тексту слова з назви папки клієнта (ПІБ), щоб прізвища не давали хибних «родичів» і «кредиторів»."""
+    if not client_tokens:
+        return text
+    return ' '.join(w for w in text.split() if w not in client_tokens)
 
 
 def _best_match(regexes, text):
@@ -136,9 +157,15 @@ def classify(name: str, mime: str = '', folders: tuple = ()) -> dict:
     flags['is_copy'] = any(rx.search(text) for rx in status_rx['is_copy'])
     flags['signed_container'] = signed
     flags['is_zip'] = archive and not signed
-    subject = 'relative' if any(rx.search(t) for rx in relative_rx for t in [text] + folder_texts[:1]) else 'debtor'
-    creditor = detect_creditor(text) or next((c for c in map(detect_creditor, folder_texts[:2]) if c), None)
-    extra = dict(flags=flags, subject=subject, creditor=creditor)
+    # остання папка — папка клієнта «ПІБ, +380…»: у сигнали родича / кредитора вона не йде, а її слова вирізаються
+    client_tokens = set(_NAME_TOKEN_RX.findall(folder_texts[-1])) if folder_texts else set()
+    inner_folders = [_strip_client_name(t, client_tokens) for t in folder_texts[:-1]]
+    text_nc = _strip_client_name(text, client_tokens)
+    subject = 'relative' if any(rx.search(t) for rx in relative_rx for t in [text_nc] + inner_folders[:1]) else 'debtor'
+    creditor = detect_creditor(text_nc) or next((c for c in map(detect_creditor, inner_folders[:2]) if c), None)
+    secret = bool(_SECRET_NAME_RX.search(raw) or _SECRET_NAME_RX.search(text)
+                  or any(_SECRET_FOLDER_RX.search(t) for t in folder_texts[:-1]))
+    extra = dict(flags=flags, subject=subject, creditor=creditor, secret=secret)
 
     name_hits = []
     for code, prio, name_rx, _ in _compiled():
@@ -176,6 +203,11 @@ def classify(name: str, mime: str = '', folders: tuple = ()) -> dict:
             scored.append((score, code, hit))
         scored.sort(reverse=True)
         score, code, hit = scored[0]
+        if code in ('15.01', '15.02') and _RESPONSE_RX.search(text):
+            # 14.04 (bare «відповід») або 08.01 (МРЕО) завжди є серед збігів у такій назві
+            resp = next((s for s in scored if not s[1].startswith('15.')), None)
+            if resp:
+                score, code, hit = resp
         if folder_hit and folder_hit[0] == code:
             conf, method = 0.95, 'name+folder'
         elif folder_hit and folder_hit[0][:2] == code[:2]:
@@ -210,10 +242,18 @@ def classify(name: str, mime: str = '', folders: tuple = ()) -> dict:
 
 
 def _result(code, conf, method, rule, alt, extra, also=()):
-    if extra['subject'] == 'relative' and code in RELATIVE_REMAP:
+    subject = extra['subject']
+    if subject == 'relative' and code in RELATIVE_REMAP:
         code = RELATIVE_REMAP[code]
         rule += ' +relative'
+    if code in FAMILY_OWN_TYPES:
+        subject = 'debtor'
     d = DOC_TYPES_BY_CODE[code]
+    sensitive, parse, also = d['sensitive'], d['parse'], list(also)
+    if extra['secret']:
+        sensitive, parse = True, 'skip'
+        if code != '25.01' and '25.01' not in also:
+            also.append('25.01')
     return {
         'doc_type': code,
         'block': d['block'],
@@ -221,10 +261,10 @@ def _result(code, conf, method, rule, alt, extra, also=()):
         'method': method,
         'rule': rule,
         'alt_doc_type': alt,
-        'parse': d['parse'],
-        'sensitive': d['sensitive'],
-        'also_contains': list(also),
-        'subject': extra['subject'],
+        'parse': parse,
+        'sensitive': sensitive,
+        'also_contains': also,
+        'subject': subject,
         'creditor': extra['creditor'],
         **extra['flags'],
     }

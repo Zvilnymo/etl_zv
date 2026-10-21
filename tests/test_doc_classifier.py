@@ -106,9 +106,53 @@ def test_classify(name, folders, expected):
     assert classify(name, mime, folders)['doc_type'] == expected
 
 
-def test_sensitive_never_parsed():
-    r = classify('Пароль від ЕЦП.txt', 'text/plain', ('ЕЦП',) + CLIENT)
-    assert r['sensitive'] and r['parse'] == 'skip'
+SECRET_CASES = [
+    ('Пароль від ЕЦП.txt', ('ЕЦП',) + CLIENT),
+    ('Password.txt', CLIENT),
+    ('pass.txt', CLIENT),
+    ('Логін Приват24.txt', CLIENT),
+    ('Ухвала пароль ел суд.txt', CLIENT),
+    ('Пошта та пароль для електронного суду.txt', CLIENT),
+    ('Key-6.dat', CLIENT),
+    ('ключ.pfx', CLIENT),
+    ('IMG_1.jpg', ('Паролі',) + CLIENT),
+    ('scan.pdf', ('Доступи',) + CLIENT),
+]
+
+
+@pytest.mark.parametrize('name,folders', SECRET_CASES)
+def test_sensitive_never_parsed(name, folders):
+    r = classify(name, 'text/plain', folders)
+    assert r['sensitive'] and r['parse'] == 'skip', r
+
+
+def test_client_surname_is_not_relative_or_creditor():
+    for surname in ('Братко Олег, +380671234567', 'Дружиніна Олена', 'Алексеєнко Ірина', 'Моногарова Олена'):
+        r = classify('паспорт Братко.pdf', 'application/pdf', ('Особисті документи', surname))
+        assert r['subject'] == 'debtor' and r['creditor'] is None, (surname, r)
+        r = classify('IMG_1.jpg', 'image/jpeg', ('Особисті документи', surname))
+        assert r['doc_type'] == '00.01' and r['creditor'] is None, (surname, r)
+
+
+@pytest.mark.parametrize('name,folders,expected', [
+    ('Відповідь на адвокатський запит ПриватБанк.pdf', ('АДВ 01.01.26',) + CLIENT, '14.04'),
+    ('ответ на адвокатский запрос.pdf', CLIENT, '14.04'),
+    ('Відповідь на адвокатський запит МРЕО.pdf', CLIENT, '08.01'),
+    ('Адвокатський запит ПриватБанк.pdf', CLIENT, '15.01'),
+    ('Договір оренди.pdf', PERS, '06.02'),
+    ('Договір дарування квартири.pdf', CLIENT, '13.01'),
+    ('Договір купівлі-продажу авто.pdf', CLIENT, '13.01'),
+    ('Договір.pdf', ('Кредитні договори',) + CLIENT, '14.01'),
+    ('паспорт донька.pdf', PERS, '02.04'),
+    ('доходи зятя.pdf', PERS, '05.05'),
+    ('Свідоцтво про народження сина.pdf', PERS, '02.03'),
+])
+def test_review_round2(name, folders, expected):
+    assert classify(name, 'application/pdf', folders)['doc_type'] == expected
+
+
+def test_family_docs_are_debtor_data():
+    assert classify('Свідоцтво про народження сина.pdf', 'application/pdf', PERS)['subject'] == 'debtor'
 
 
 def test_flags():
@@ -151,3 +195,41 @@ def test_field_codes_survive_catalog_edits(tmp_path):
     after = {f['crm_code']: f['field_code'] for f in load_fields(str(path), codes)}
     assert removed not in after
     assert all(after[c] == before[c] for c in after)
+
+
+def test_debtor_docs_link_only_contact_fields():
+    cb = build()
+    by_code = {f['field_code']: f for f in cb['fields']}
+    for l in cb['links']:
+        if l['link_type'] == 'evidence' and l['doc_type'][:2] in ('01', '02', '05', '07', '10'):
+            assert 'Контакт' in by_code[l['field_code']]['entities'], l
+
+
+def test_xlsx_cells_never_become_formulas():
+    from etl.gdrive.xlsx_export import _cell
+    assert _cell('=HYPERLINK("http://x","click")').startswith("'")
+    assert _cell('+380671234567') == "'+380671234567"
+    assert _cell('Паспорт.pdf') == 'Паспорт.pdf'
+
+
+def test_crawl_follows_folder_shortcuts_and_terminates():
+    from etl.gdrive import drive_client as dc
+
+    tree = {
+        'root': [{'id': 'c1', 'name': 'Клієнт', 'mimeType': dc.FOLDER_MIME}],
+        'c1': [{'id': 'f1', 'name': 'a.pdf', 'mimeType': 'application/pdf'},
+               {'id': 's1', 'name': 'Ярлик', 'mimeType': dc.SHORTCUT_MIME,
+                'shortcutDetails': {'targetId': 't1', 'targetMimeType': dc.FOLDER_MIME}},
+               {'id': 's2', 'name': 'b.pdf', 'mimeType': dc.SHORTCUT_MIME,
+                'shortcutDetails': {'targetId': 'f9', 'targetMimeType': 'application/pdf'}}],
+        't1': [{'id': 'f2', 'name': 'УБКІ.pdf', 'mimeType': 'application/pdf'}],
+        'empty': [],
+    }
+    client = dc.DriveClient.__new__(dc.DriveClient)
+    client.calls, client.crawl_errors = 0, 0
+    import threading
+    client._err_lock = threading.Lock()
+    client.list_children = lambda fid: iter(tree.get(fid, []))
+    got = sorted(f['id'] for f in client.crawl([{'id': 'root', 'name': 'Клієнти'}], workers=3))
+    assert got == ['f1', 'f2']
+    assert list(client.crawl([{'id': 'empty', 'name': 'E'}], workers=2)) == []

@@ -119,8 +119,15 @@ CREATE TABLE IF NOT EXISTS docs.etl_state (
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Реєстр з назвами та ознакою дубля за вмістом
-CREATE OR REPLACE VIEW docs.vw_document_registry AS
+-- Представлення перестворюються: при повторному застосуванні міграції CREATE OR REPLACE не дозволяє міняти колонки
+DROP VIEW IF EXISTS docs.vw_registry_segments;
+DROP VIEW IF EXISTS docs.vw_parse_queue;
+DROP VIEW IF EXISTS docs.vw_document_registry;
+
+-- Реєстр з назвами та ознакою дубля за вмістом.
+-- Оригінал серед копій (однаковий md5 у клієнта) — неархівний, придатний до парсингу, з конкретним типом;
+-- решта копій is_duplicate.
+CREATE VIEW docs.vw_document_registry AS
 SELECT
     d.doc_instance_code,
     t.doc_code,
@@ -140,7 +147,11 @@ SELECT
     d.needs_check,
     d.is_copy,
     (d.md5 IS NOT NULL AND ROW_NUMBER() OVER (
-        PARTITION BY d.client_key, d.md5 ORDER BY d.created_time, d.file_id) > 1) AS is_duplicate,
+        PARTITION BY d.client_key, d.md5
+        ORDER BY d.is_archived, (d.parse = 'skip' OR d.sensitive), (d.doc_type LIKE '00.%'),
+                 d.confidence DESC, d.created_time, d.file_id) > 1) AS is_duplicate,
+    d.is_zip,
+    d.signed_container,
     d.client_key,
     d.client_folder,
     d.client_phone,
@@ -158,7 +169,7 @@ JOIN docs.dim_doc_types t ON t.doc_type = d.doc_type
 JOIN docs.dim_blocks    b ON b.block    = d.block;
 
 -- Черга для парсера: що парсити і які поля CRM заповнювати з кожного документа
-CREATE OR REPLACE VIEW docs.vw_parse_queue AS
+CREATE VIEW docs.vw_parse_queue AS
 SELECT
     r.doc_instance_code,
     r.doc_code,
@@ -166,6 +177,8 @@ SELECT
     r.parse,
     r.confidence,
     r.subject,                               -- relative: документ родича — не заповнювати поля самого боржника
+    r.creditor,                              -- для документів по боргу: кредитор (елемент СП «Список кредиторів»)
+    r.is_zip,
     r.client_key,
     r.client_phone,
     r.file_id,
@@ -175,17 +188,18 @@ SELECT
     ARRAY_AGG(f.crm_code   ORDER BY f.field_code) FILTER (WHERE f.crm_code IS NOT NULL) AS crm_fields,
     ARRAY_AGG(f.field_code ORDER BY f.field_code) FILTER (WHERE f.crm_code IS NOT NULL) AS zv_field_codes
 FROM docs.vw_document_registry r
-LEFT JOIN docs.doc_type_fields l ON l.doc_type = r.doc_type
+-- output-звʼязки (поля, які йдуть у Заяву / План / Декларацію) — не ціль парсингу: це наші чернетки
+LEFT JOIN docs.doc_type_fields l ON l.doc_type = r.doc_type AND l.link_type <> 'output'
 LEFT JOIN docs.dim_crm_fields  f ON f.field_code = l.field_code
 WHERE r.parse <> 'skip'
   AND NOT r.sensitive
   AND NOT r.is_archived
   AND NOT r.is_duplicate
-GROUP BY r.doc_instance_code, r.doc_code, r.doc_type_name, r.parse, r.confidence, r.subject,
+GROUP BY r.doc_instance_code, r.doc_code, r.doc_type_name, r.parse, r.confidence, r.subject, r.creditor, r.is_zip,
          r.client_key, r.client_phone, r.file_id, r.file_name, r.mime_type, r.web_view_link;
 
 -- Зведення по сегментах
-CREATE OR REPLACE VIEW docs.vw_registry_segments AS
+CREATE VIEW docs.vw_registry_segments AS
 SELECT
     t.doc_code,
     b.name  AS block_name,

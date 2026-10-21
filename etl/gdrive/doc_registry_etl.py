@@ -27,12 +27,12 @@ from etl.gdrive.classifier import classify
 from etl.gdrive.codebook import load_codebook
 from etl.gdrive.drive_client import SHORTCUT_MIME, DriveClient
 from etl.gdrive.taxonomy import BLOCKS, DOC_TYPES_BY_CODE, full_code
-from etl.gdrive.xlsx_export import REGISTRY_COLUMNS, summarize, write_registry_xlsx
+from etl.gdrive.xlsx_export import summarize, write_registry_xlsx
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-CLASSIFIER_VERSION = '2026-10-21.1'
+CLASSIFIER_VERSION = '2026-10-21.2'
 BATCH_SIZE = 2000
 DEFAULT_ROOTS = '14kOu9JKNWxrXFCt3F0AhTtjy2s7njHuE:Клієнти,1mLXcs9w79Kg2Xbi42AiXFZ4bxSwE3ALM:Клієнти_клон'
 _PHONE_RE = re.compile(r'(?:\+?38)?\s?\(?0\d{2}\)?[\s-]?\d{3}[\s-]?\d{2}[\s-]?\d{2}')
@@ -115,10 +115,15 @@ def build_record(f: dict, root: dict, path: list) -> dict:
 
 
 def apply_override(rec: dict, override_type: str):
-    d = DOC_TYPES_BY_CODE[override_type]
+    d = DOC_TYPES_BY_CODE.get(override_type)
+    if d is None:
+        logger.warning(f"Ручне виправлення {rec['file_id']} → {override_type}: такого типу вже немає, пропущено")
+        rec['needs_check'] = True
+        return
+    sensitive = rec['sensitive'] or d['sensitive']      # виправлення типу не знімає позначку «паролі / ключі»
     rec.update(doc_type=override_type, doc_code=full_code(override_type), block=d['block'],
                block_name=BLOCKS[d['block']], doc_type_name=d['name'], confidence=1.0, method='override',
-               rule='manual', parse=d['parse'], sensitive=d['sensitive'], is_override=True)
+               rule='manual', parse='skip' if sensitive else d['parse'], sensitive=sensitive, is_override=True)
 
 
 def assign_codes_offline(records: list):
@@ -130,10 +135,32 @@ def assign_codes_offline(records: list):
         seq[k] = seq.get(k, 0) + 1
         r['doc_seq'] = seq[k]
         r['doc_instance_code'] = f"{r['doc_code']}-{r['client_key']}-{seq[k]:04d}"
-    for r in sorted(records, key=lambda r: (r['created_time'] or '', r['file_id'])):
+    # оригінал серед копій — неархівний, придатний до парсингу, з конкретним типом (як у vw_document_registry)
+    for r in sorted(records, key=_original_rank):
         key = (r['client_key'], r['md5'])
         r['is_duplicate'] = bool(r['md5']) and key in seen_md5
         seen_md5.add(key)
+
+
+def _original_rank(r):
+    return (r['is_archived'], r['parse'] == 'skip' or r['sensitive'], r['doc_type'].startswith('00.'),
+            -(r['confidence'] or 0), r['created_time'] or '', r['file_id'])
+
+
+def _csv_safe(v):
+    if isinstance(v, list):
+        v = ';'.join(v)
+    if isinstance(v, str) and v.startswith(('=', '+', '-', '@', '\t', '\r')):
+        return "'" + v
+    return v
+
+
+def check_roots(client: DriveClient, roots: list):
+    """Корінь, до якого сервісний акаунт не має доступу, Drive віддає як порожню папку — перевіряємо явно."""
+    for r in roots:
+        meta = client.get_file(r['id'])
+        if meta.get('mimeType') != 'application/vnd.google-apps.folder' or meta.get('trashed'):
+            raise RuntimeError(f"Корінь {r['name']} ({r['id']}) не є доступною папкою")
 
 
 def _fields_by_type(cb: dict, limit: int = 40) -> dict:
@@ -308,12 +335,13 @@ def run(mode: str = 'full', use_db: bool = True, limit_clients: int = None,
         csv_path: str = None, xlsx_path: str = None) -> dict:
     started = time.monotonic()
     run_started_at = datetime.now(timezone.utc)
-    cb = load_codebook()
-    roots = get_roots()
-    client = DriveClient()
     conn = None
     processed = 0
     try:
+        cb = load_codebook()
+        roots = get_roots()
+        client = DriveClient()
+        check_roots(client, roots)
         overrides = {}
         since = None
         if use_db:
@@ -334,6 +362,7 @@ def run(mode: str = 'full', use_db: bool = True, limit_clients: int = None,
 
         keep = not use_db or xlsx_path is not None
         records, batch, seen = [], [], set()
+        per_root = {r['id']: 0 for r in roots}
         csv_fh = open(csv_path, 'w', newline='', encoding='utf-8-sig') if csv_path else None
         csv_writer = csv.DictWriter(csv_fh, fieldnames=_FACT_COLS + ['doc_code', 'doc_type_name', 'block_name'],
                                     extrasaction='ignore') if csv_fh else None
@@ -347,8 +376,9 @@ def run(mode: str = 'full', use_db: bool = True, limit_clients: int = None,
                 apply_override(rec, overrides[rec['file_id']])
             processed += 1
             seen.add(rec['file_id'])
+            per_root[root['id']] = per_root.get(root['id'], 0) + 1
             if csv_writer:
-                csv_writer.writerow({k: (';'.join(v) if isinstance(v, list) else v) for k, v in rec.items()})
+                csv_writer.writerow({k: _csv_safe(v) for k, v in rec.items()})
             if keep:
                 records.append(rec)
             if conn is not None:
@@ -358,6 +388,13 @@ def run(mode: str = 'full', use_db: bool = True, limit_clients: int = None,
                     batch = []
         if csv_fh:
             csv_fh.close()
+
+        if mode == 'full':
+            for r in roots:
+                if per_root.get(r['id'], 0) == 0:
+                    # порожній корінь = найімовірніше немає доступу: не видаляти його рядки й не зсувати мітку
+                    logger.error(f"Корінь {r['name']} ({r['id']}) не дав жодного файлу — перевірте доступ")
+                    client.count_error()
 
         deleted = coded = 0
         if conn is not None:

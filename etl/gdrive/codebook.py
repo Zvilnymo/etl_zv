@@ -22,7 +22,7 @@ from collections import defaultdict
 import openpyxl
 
 from etl.gdrive.taxonomy import (
-    BLOCKS, DOC_TYPES, EVIDENCE_EXCLUDE_ENTITIES, EVIDENCE_EXCLUDE_NAME_PATTERNS, EVIDENCE_ROLE, OUTPUT_COLUMNS,
+    BLOCKS, DEBTOR_BLOCKS, DEBTOR_ENTITIES, DOC_TYPES, EVIDENCE_EXCLUDE_ENTITIES, EVIDENCE_EXCLUDE_NAME_PATTERNS, EVIDENCE_ROLE, OUTPUT_COLUMNS,
     full_code,
 )
 
@@ -141,6 +141,8 @@ def build(catalog_path: str = DEFAULT_CATALOG, field_codes: dict = None) -> dict
             f = by_crm.get(crm)
             if f is None:
                 raise ValueError(f"{d['code']}: file-поле {crm} відсутнє в каталозі")
+            if (f['crm_name'] or '').startswith('[АРХІВ'):
+                continue        # поле виведене з ужитку в CRM (10.2026) — не заповнювати
             links.append(_link(d, f, 'scan'))
             seen.add(crm)
         for crm in d['extra_fields']:
@@ -153,6 +155,9 @@ def build(catalog_path: str = DEFAULT_CATALOG, field_codes: dict = None) -> dict
         for key in d['evidence']:
             used_evidence.add(key)
             for f in by_evidence.get(key, []):
+                if f['block'] in DEBTOR_BLOCKS and d['block'] in DEBTOR_BLOCKS \
+                        and not set(f['entities']) & DEBTOR_ENTITIES:
+                    continue
                 if f['crm_code'] not in seen and is_evidence_field(f):
                     links.append(_link(d, f, 'evidence'))
                     seen.add(f['crm_code'])
